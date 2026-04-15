@@ -1,0 +1,1812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Petty Expense Tracker — Aaray Packaging Pvt. Ltd.</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F4F7F9;color:#1B2A4A;min-height:100vh}
+.topbar{background:#1B2A4A;padding:0 1.5rem;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;height:52px}
+.topbar h1{color:#fff;font-size:16px;font-weight:700;white-space:nowrap}
+.topbar-right{display:flex;align-items:center;gap:10px}
+.sync-btn{background:#028090;color:#fff;border:none;padding:6px 14px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:600;white-space:nowrap}
+.sync-btn:hover{background:#016b79}
+.sync-btn:disabled{background:#5a8a90;cursor:not-allowed}
+.sync-status{font-size:11px;color:#8BAFC8;white-space:nowrap}
+.container{max-width:900px;margin:0 auto;padding:1.25rem 1rem 3rem}
+.summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1.25rem}
+@media(max-width:600px){.summary-grid{grid-template-columns:repeat(2,1fr)}}
+.metric{background:#fff;border-radius:10px;padding:12px 14px;border:1px solid #E2EAF0}
+.metric-label{font-size:11px;color:#64748B;margin-bottom:4px}
+.metric-value{font-size:22px;font-weight:700;color:#1B2A4A}
+.metric-value.warn{color:#F59E0B}
+.metric-value.good{color:#10B981}
+.tabs{display:flex;border-bottom:1.5px solid #E2EAF0;background:#fff;border-radius:10px 10px 0 0;overflow:hidden}
+.tab{flex:1;padding:11px 6px;font-size:12.5px;cursor:pointer;color:#64748B;text-align:center;border-bottom:2.5px solid transparent;margin-bottom:-1.5px;transition:all .15s;font-weight:500}
+.tab.active{color:#028090;border-bottom-color:#028090;background:#F0FAFA}
+.tab:hover:not(.active){background:#F8FAFB}
+.card{background:#fff;border:1px solid #E2EAF0;border-radius:10px;padding:1.1rem 1.25rem;margin-bottom:1rem}
+.card-title{font-size:14px;font-weight:700;color:#1B2A4A;margin-bottom:14px}
+.form-row{display:grid;gap:10px;margin-bottom:10px}
+.r2{grid-template-columns:1fr 1fr}
+.r3{grid-template-columns:2fr 1fr 1fr}
+@media(max-width:540px){.r2,.r3{grid-template-columns:1fr}}
+.fg{display:flex;flex-direction:column;gap:5px}
+.fg label{font-size:12px;color:#64748B;font-weight:500}
+.fg input,.fg select,.fg textarea{width:100%;padding:8px 10px;border:1px solid #D1D9E0;border-radius:7px;font-size:13px;color:#1B2A4A;background:#fff;outline:none;transition:border .15s;font-family:inherit}
+.fg input:focus,.fg select:focus{border-color:#028090;box-shadow:0 0 0 3px rgba(2,128,144,.1)}
+.btn-row{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
+.btn-primary{background:#028090;color:#fff;border:none;padding:9px 22px;border-radius:7px;font-size:13px;cursor:pointer;font-weight:700}
+.btn-primary:hover{background:#016b79}
+.btn-ghost{background:#fff;border:1px solid #D1D9E0;color:#64748B;padding:8px 16px;border-radius:7px;font-size:13px;cursor:pointer}
+.btn-ghost:hover{background:#F4F7F9}
+.btn-sm{padding:4px 11px;font-size:11px;border-radius:5px;border:none;cursor:pointer;font-weight:700}
+.btn-approve{background:#D1FAE5;color:#065F46}.btn-approve:hover{background:#A7F3D0}
+.btn-reject{background:#FEE2E2;color:#991B1B}.btn-reject:hover{background:#FECACA}
+.btn-export{background:#fff;border:1px solid #D1D9E0;color:#1B2A4A;padding:6px 14px;border-radius:7px;font-size:12px;cursor:pointer;font-weight:500}
+.badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:700}
+.b-fooding{background:#D1FAE5;color:#065F46}
+.b-porter{background:#FEF3C7;color:#92400E}
+.b-rider{background:#EDE9FE;color:#4C1D95}
+.b-spare{background:#DBEAFE;color:#1E40AF}
+.b-medical{background:#FFE4E6;color:#9F1239}
+.b-housekeeping{background:#FCE7F3;color:#831843}
+.b-stationery{background:#DCFCE7;color:#14532D}
+.b-cng{background:#E0F2FE;color:#075985}
+.b-toll{background:#FEF9C3;color:#713F12}
+.b-office{background:#F3E8FF;color:#5B21B6}
+.b-other{background:#F1F5F9;color:#334155}
+.b-pending{background:#FEF3C7;color:#92400E}
+.b-auto-approved{background:#DCFCE7;color:#14532D}
+.b-approved{background:#D1FAE5;color:#065F46}
+.b-rejected{background:#FEE2E2;color:#991B1B}
+.filter-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.chip{padding:5px 11px;border-radius:999px;font-size:12px;border:1px solid #D1D9E0;background:#fff;cursor:pointer;color:#64748B;font-weight:500}
+.chip.active{background:#028090;color:#fff;border-color:#028090}
+.chip:hover:not(.active){border-color:#028090;color:#028090}
+.table-wrap{overflow-x:auto;border-radius:8px;border:1px solid #E2EAF0}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{text-align:left;font-size:11px;font-weight:700;color:#64748B;padding:9px 10px;background:#F8FAFC;border-bottom:1px solid #E2EAF0;white-space:nowrap}
+td{padding:9px 10px;border-bottom:1px solid #F1F5F9;color:#1B2A4A;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#FAFCFD}
+.del-btn{background:none;border:none;cursor:pointer;color:#CBD5E1;font-size:13px;padding:2px 6px;border-radius:4px}
+.del-btn:hover{color:#EF4444;background:#FEE2E2}
+.empty-state{text-align:center;padding:3rem 1rem;color:#94A3B8;font-size:13px}
+.photo-box{border:1.5px dashed #CBD5E1;border-radius:8px;padding:18px;text-align:center;cursor:pointer;background:#F8FAFC}
+.photo-box:hover{border-color:#028090;background:#F0FAFA}
+.photo-box p{font-size:12px;color:#64748B;margin-top:6px}
+.thumb-wrap{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.thumb{width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid #E2EAF0;cursor:pointer}
+.tfoot-row td{font-weight:700;background:#F8FAFC;border-top:1.5px solid #E2EAF0}
+.toprow{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px}
+.notice{border-radius:8px;padding:10px 14px;font-size:12px;margin-bottom:12px;font-weight:500}
+.notice.success{background:#D1FAE5;color:#065F46;border:1px solid #A7F3D0}
+.notice.error{background:#FEE2E2;color:#991B1B;border:1px solid #FECACA}
+.notice.info{background:#DBEAFE;color:#1E40AF;border:1px solid #BFDBFE}
+/* Settings */
+.setting-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #F1F5F9}
+.setting-row:last-child{border-bottom:none}
+.setting-label{font-size:13px;color:#1B2A4A;font-weight:500;min-width:140px}
+.setting-desc{font-size:12px;color:#64748B;flex:1}
+.setting-input{flex:2}
+/* Owner dashboard */
+.dash-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:1.25rem}
+@media(max-width:600px){.dash-grid{grid-template-columns:1fr 1fr}}
+.dash-metric{background:#fff;border-radius:10px;padding:14px 16px;border:1px solid #E2EAF0;text-align:center}
+.dash-num{font-size:28px;font-weight:800;color:#028090}
+.dash-lbl{font-size:12px;color:#64748B;margin-top:4px}
+.bar-wrap{margin-bottom:8px}
+.bar-label{display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px}
+.bar-label span:first-child{color:#1B2A4A;font-weight:500}
+.bar-label span:last-child{color:#64748B}
+.bar-track{background:#F1F5F9;border-radius:999px;height:8px;overflow:hidden}
+.bar-fill{height:8px;border-radius:999px;background:#028090;transition:width .4s}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;align-items:center;justify-content:center;padding:1rem}
+.modal-overlay.open{display:flex}
+.modal{background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:500px;max-height:90vh;overflow-y:auto}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.modal-header h3{font-size:16px;font-weight:700}
+.modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:#94A3B8;padding:2px 6px;border-radius:4px}
+.modal-close:hover{color:#EF4444;background:#FEE2E2}
+.detail-row{display:flex;justify-content:space-between;align-items:flex-start;padding:7px 0;border-bottom:1px solid #F1F5F9;gap:12px}
+.detail-row:last-child{border-bottom:none}
+.dl{font-size:12px;color:#64748B;white-space:nowrap;flex-shrink:0}
+.dr{font-size:13px;color:#1B2A4A;font-weight:600;text-align:right}
+.photo-preview{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.photo-preview img{width:100px;height:100px;object-fit:cover;border-radius:8px;border:1px solid #E2EAF0;cursor:pointer}
+.section-label{font-size:11px;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>Petty Expense Tracker</h1>
+  <div style="text-align:center">
+    <p style="font-size:13px;font-weight:600;color:#fff;letter-spacing:.4px;white-space:nowrap">Aaray Packaging Private Limited</p>
+  </div>
+  <div class="topbar-right" style="justify-content:flex-end">
+    <span style="font-size:12px;color:#8BAFC8">Hi, <span id="user-name-display" style="color:#02C39A;font-weight:600"></span></span>
+    <button onclick="switchUser()" style="background:none;border:1px solid #3a5068;color:#8BAFC8;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer">Switch</button>
+    <span class="sync-status" id="sync-status"></span>
+    <button class="sync-btn" onclick="syncToSheet()" id="sync-btn">Sync to Sheet</button>
+  </div>
+</div>
+
+<!-- LOGIN SCREEN -->
+<div id="login-screen" style="display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 52px);padding:1rem">
+  <div style="background:#fff;border-radius:14px;border:1px solid #E2EAF0;padding:2rem;width:100%;max-width:360px;text-align:center">
+    <div style="width:56px;height:56px;background:#E0F7FA;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#028090" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    </div>
+    <h2 style="font-size:18px;font-weight:700;color:#1B2A4A;margin-bottom:6px">Who are you?</h2>
+    <p style="font-size:13px;color:#64748B;margin-bottom:1.5rem">Enter your name and select your role</p>
+    <input type="text" id="login-name" placeholder="Your full name" style="width:100%;padding:10px 14px;border:1px solid #D1D9E0;border-radius:8px;font-size:14px;color:#1B2A4A;outline:none;margin-bottom:10px" onkeydown="if(event.key==='Enter')loginUser()" oninput="autoDetectRole()">
+    <div id="login-role-row"><select id="login-role" style="width:100%;padding:10px 14px;border:1px solid #D1D9E0;border-radius:8px;font-size:14px;color:#1B2A4A;margin-bottom:12px;background:#fff">
+      <option value="employee">Employee</option>
+      <option value="supervisor">Supervisor</option>
+    </select></div>
+    <button onclick="loginUser()" style="width:100%;background:#028090;color:#fff;border:none;padding:11px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">Start →</button>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="main-app" style="display:none">
+<div class="container">
+
+  <div id="global-notice" class="notice" style="display:none"></div>
+
+  <div class="summary-grid">
+    <div class="metric"><div class="metric-label">Today's total</div><div class="metric-value" id="s-today">₹0</div></div>
+    <div class="metric"><div class="metric-label">This month</div><div class="metric-value" id="s-month">₹0</div></div>
+    <div class="metric"><div class="metric-label">Pending approval</div><div class="metric-value warn" id="s-pending">0</div></div>
+    <div class="metric"><div class="metric-label">Approved today</div><div class="metric-value good" id="s-approved">0</div></div>
+  </div>
+
+  <div class="tabs" id="main-tabs">
+    <div class="tab active" onclick="showTab('add',this)" id="tab-btn-add">+ Add expense</div>
+    <div class="tab" onclick="showTab('log',this)" id="tab-btn-log">Expense log</div>
+    <div class="tab" onclick="showTab('approval',this)" id="tab-btn-approval" style="display:none">Approval queue <span id="pb" style="background:#F59E0B;color:#fff;border-radius:999px;padding:1px 7px;font-size:11px;margin-left:3px;display:none"></span></div>
+    <div class="tab" onclick="showTab('owner',this)" id="tab-btn-owner" style="display:none">Owner dashboard</div>
+    <div class="tab" onclick="showTab('settings',this)" id="tab-btn-settings" style="display:none">Settings</div>
+  </div>
+
+  <!-- ADD TAB -->
+  <div id="tab-add">
+    <div class="card">
+      <div class="card-title">Staff &amp; Date</div>
+      <div class="form-row r3">
+        <div class="fg"><label>Staff Name</label><input type="text" id="i-staff" readonly style="background:#F8FAFC;color:#64748B;cursor:not-allowed"></div>
+        <div class="fg"><label>Location *</label>
+          <select id="i-location">
+            <option value="Vijay Nagar">Vijay Nagar</option>
+            <option value="Lal Kuan">Lal Kuan</option>
+          </select>
+        </div>
+        <div class="fg"><label>Date *</label><input type="date" id="i-date"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Expense Details</div>
+      <div class="form-row r2">
+        <div class="fg"><label>Category *</label>
+          <select id="i-cat" onchange="toggleFields()">
+            <option value="fooding">Fooding</option>
+            <option value="porter">Porter</option>
+            <option value="rider">Conveyance (Rider)</option>
+            <option value="spare">Machine Spare</option>
+            <option value="medical">Medical / First Aid</option>
+            <option value="housekeeping">Housekeeping</option>
+            <option value="stationery">Stationery</option>
+            <option value="cng">CNG</option>
+            <option value="toll">Toll Tax</option>
+            <option value="office">Office Expense</option>
+            <option value="other">Others</option>
+          </select>
+        </div>
+        <div class="fg"><label>Amount (₹) *</label><input type="number" id="i-amount" placeholder="0" min="0"></div>
+      </div>
+      <div class="form-row r2" id="conv-row" style="display:none">
+        <div class="fg"><label>From Location</label><input type="text" id="i-from" placeholder="e.g. Factory gate"></div>
+        <div class="fg"><label>To Location</label><input type="text" id="i-to" placeholder="e.g. District office"></div>
+      </div>
+      <div class="form-row r2" id="rider-row" style="display:none">
+        <div class="fg"><label>Rider Name</label><input type="text" id="i-rider" placeholder="e.g. Suresh Yadav"></div>
+        <div class="fg"><label>Vehicle Number</label><input type="text" id="i-vehicle" placeholder="e.g. UP32 AB 1234"></div>
+      </div>
+      <div class="form-row">
+        <div class="fg"><label>Description *</label><input type="text" id="i-desc" placeholder="Brief Description Of This Expense"></div>
+      </div>
+    </div>
+
+    <div class="card" id="vendor-card">
+      <div class="card-title">Vendor Details <span id="vendor-optional" style="font-size:12px;color:#94A3B8;font-weight:400"></span></div>
+      <div class="form-row r2">
+        <div class="fg"><label id="lbl-vname">Vendor Name</label><input type="text" id="i-vname" placeholder="e.g. Sharma Stationery"></div>
+        <div class="fg"><label id="lbl-vphone">Vendor Contact</label><input type="text" id="i-vphone" placeholder="Phone Number"></div>
+      </div>
+      <div class="form-row r2">
+        <div class="fg"><label id="lbl-vaddr">Vendor Address</label><input type="text" id="i-vaddr" placeholder="Shop / Area Name"></div>
+        <div class="fg"><label>GST / Invoice Number</label><input type="text" id="i-vinv" placeholder="Optional"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Photo Proof * <span style="font-size:12px;color:#94A3B8;font-weight:400">(up to 3, compulsory)</span></div>
+      <div class="photo-box" onclick="document.getElementById('i-photo').click()">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="1.5" style="margin:0 auto;display:block">
+          <rect x="2" y="7" width="20" height="14" rx="2"/><circle cx="12" cy="14" r="3"/>
+          <path d="M16 7l-1.5-3h-5L8 7"/>
+        </svg>
+        <p>Tap to upload bill / receipt photo</p>
+        <p style="font-size:11px;color:#94A3B8;margin-top:2px">JPG or PNG</p>
+      </div>
+      <input type="file" id="i-photo" accept="image/*" multiple style="display:none" onchange="handlePhotos(event)">
+      <div class="thumb-wrap" id="thumbs"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-ghost" onclick="clearForm()">Clear</button>
+      <button class="btn-primary" onclick="addExpense()">Submit for approval</button>
+    </div>
+  </div>
+
+  <!-- LOG TAB -->
+  <div id="tab-log" style="display:none">
+    <div class="card">
+      <div class="toprow">
+        <div class="filter-row" style="margin:0">
+          <button class="chip active" onclick="setFilter('all',this)">All</button>
+          <button class="chip" onclick="setFilter('fooding',this)">Fooding</button>
+          <button class="chip" onclick="setFilter('porter',this)">Porter</button>
+          <button class="chip" onclick="setFilter('rider',this)">Rider</button>
+          <button class="chip" onclick="setFilter('spare',this)">Machine Spare</button>
+          <button class="chip" onclick="setFilter('medical',this)">Medical</button>
+          <button class="chip" onclick="setFilter('housekeeping',this)">Housekeeping</button>
+          <button class="chip" onclick="setFilter('stationery',this)">Stationery</button>
+          <button class="chip" onclick="setFilter('cng',this)">CNG</button>
+          <button class="chip" onclick="setFilter('toll',this)">Toll Tax</button>
+          <button class="chip" onclick="setFilter('office',this)">Office Expense</button>
+          <button class="chip" onclick="setFilter('other',this)">Others</button>
+        </div>
+        <button class="btn-export" onclick="exportCSV()">Export CSV</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Ref</th><th>Date</th><th>Staff</th><th>Location</th><th>Category</th>
+            <th>Description</th><th>Vendor</th><th style="text-align:right">Amount</th>
+            <th>Status</th><th>Proof</th><th></th>
+          </tr></thead>
+          <tbody id="log-tbody"></tbody>
+          <tfoot id="log-tfoot"></tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- APPROVAL TAB -->
+  <div id="tab-approval" style="display:none">
+    <div class="notice info" id="appr-notice" style="display:none"></div>
+    <div class="card">
+      <div class="toprow">
+        <div>
+          <div class="card-title" style="margin-bottom:2px" id="appr-queue-title">Pending approval</div>
+          <p style="font-size:12px;color:#64748B" id="appr-queue-desc">Review each entry, check vendor &amp; photo, then approve or reject.</p>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn-sm btn-approve" style="padding:6px 14px;font-size:12px" onclick="bulkApprove()">Approve all</button>
+          <button class="btn-export" onclick="exportCSV()">Export CSV</button>
+        </div>
+      </div>
+      <div class="table-wrap" style="margin-top:12px">
+        <table>
+          <thead><tr>
+            <th style="width:32px"><input type="checkbox" id="chk-all" onchange="toggleAllChecks(this)"></th>
+            <th>Ref</th><th>Date</th><th>Staff</th><th>Location</th><th>Category</th>
+            <th>Description</th><th>Vendor</th><th style="text-align:right">Amount</th>
+            <th>Age</th><th>Proof</th><th>Action</th>
+          </tr></thead>
+          <tbody id="appr-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- OWNER DASHBOARD TAB -->
+  <div id="tab-owner" style="display:none">
+    <div class="card">
+      <div class="toprow">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="chip active" id="odash-btn-summary" onclick="switchOwnerView('summary',this)">Summary</button>
+          <button class="chip" id="odash-btn-mom" onclick="switchOwnerView('mom',this)">Month vs Month</button>
+          <button class="chip" id="odash-btn-trend" onclick="switchOwnerView('trend',this)">Category trend</button>
+          <button class="chip" id="odash-btn-advance" onclick="switchOwnerView('advance',this)">Cash advances</button>
+          <button class="chip" id="odash-btn-history" onclick="switchOwnerView('history',this)">Approval history</button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            <select id="owner-period" onchange="onPeriodChange()" style="font-size:12px;padding:5px 8px;border:1px solid #D1D9E0;border-radius:6px;color:#1B2A4A">
+              <option value="today">Today</option>
+              <option value="week">This week</option>
+              <option value="month" selected>This month</option>
+              <option value="custom">Custom range</option>
+              <option value="all">All time</option>
+            </select>
+            <div id="custom-range" style="display:none;gap:6px;align-items:center">
+              <input type="date" id="range-from" onchange="renderOwner()" style="font-size:12px;padding:5px 8px;border:1px solid #D1D9E0;border-radius:6px;color:#1B2A4A">
+              <span style="font-size:12px;color:#64748B">to</span>
+              <input type="date" id="range-to" onchange="renderOwner()" style="font-size:12px;padding:5px 8px;border:1px solid #D1D9E0;border-radius:6px;color:#1B2A4A">
+            </div>
+          </div>
+          <button class="btn-export" onclick="syncToSheet()">Sync to Sheet</button>
+          <button class="btn-export" onclick="exportCSV(true)">Export CSV</button>
+          <button class="btn-export" onclick="exportExcel()">Download Excel</button>
+          <button class="btn-export" onclick="printReport()">Print / PDF</button>
+        </div>
+      </div>
+    </div>
+    <div id="owner-view-summary">
+    <div class="dash-grid" id="owner-metrics"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+      <div class="card" id="owner-cat-card">
+        <div class="card-title">By category</div>
+        <div id="owner-cat"></div>
+      </div>
+      <div class="card" id="owner-dept-card">
+        <div class="card-title">By staff</div>
+        <div id="owner-dept"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Daily spend — last 14 days</div>
+      <div id="owner-daily" style="overflow-x:auto"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Staff monthly summary</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Staff</th><th style="text-align:right">Submitted</th><th style="text-align:right">Approved</th><th style="text-align:right">Pending</th><th style="text-align:right">Rejected</th></tr></thead>
+          <tbody id="staff-summary-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title" id="owner-table-title">All expenses</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Date</th><th>Staff</th><th>Category</th><th>Description</th><th>Vendor</th><th style="text-align:right">Amount</th><th>Status</th>
+          </tr></thead>
+          <tbody id="owner-tbody"></tbody>
+          <tfoot id="owner-tfoot"></tfoot>
+        </table>
+      </div>
+    </div>
+    </div><!-- end owner-view-summary -->
+
+    <!-- Month vs Month view -->
+    <div id="owner-view-mom" style="display:none">
+      <div class="card"><div class="card-title">Month vs month comparison</div><div id="mom-content"></div></div>
+    </div>
+
+    <!-- Category trend view -->
+    <div id="owner-view-trend" style="display:none">
+      <div class="card"><div class="card-title">Category spend trend — last 3 months</div><div id="trend-content"></div></div>
+    </div>
+
+    <!-- Cash advances view -->
+    <div id="owner-view-advance" style="display:none">
+      <div class="card">
+        <div class="toprow">
+          <div class="card-title" style="margin-bottom:0">Cash advances</div>
+          <button class="btn-primary" style="padding:6px 16px;font-size:12px" onclick="openAdvanceModal()">+ Give advance</button>
+        </div>
+        <div class="table-wrap" style="margin-top:12px">
+          <table>
+            <thead><tr><th>Date</th><th>Staff</th><th>Location</th><th style="text-align:right">Advance given</th><th style="text-align:right">Expenses submitted</th><th style="text-align:right">Balance outstanding</th><th>Notes</th></tr></thead>
+            <tbody id="advance-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Approval history view -->
+    <div id="owner-view-history" style="display:none">
+      <div class="card"><div class="card-title">Approval history</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Ref</th><th>Date</th><th>Staff</th><th>Category</th><th style="text-align:right">Amount</th><th>Status</th><th>Approved/Rejected by</th><th>Remark</th></tr></thead>
+            <tbody id="history-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- SETTINGS TAB -->
+  <div id="tab-settings" style="display:none">
+    <div class="card">
+      <div class="card-title">Google Sheets sync</div>
+      <p style="font-size:13px;color:#64748B;margin-bottom:14px;line-height:1.6">
+        Connect to Google Sheets so the owner can see all expenses live from any device.
+        Follow the setup guide below, then paste your Web App URL here.
+      </p>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Web App URL</div>
+          <div class="setting-desc">Paste the URL from your Google Apps Script deployment</div>
+        </div>
+        <div class="setting-input">
+          <input type="url" id="sheet-url" placeholder="https://script.google.com/macros/s/..." style="width:100%;padding:8px 10px;border:1px solid #D1D9E0;border-radius:7px;font-size:12px">
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn-ghost" onclick="testConnection()">Test connection</button>
+        <button class="btn-primary" onclick="saveSettings()">Save</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Setup guide — Google Sheets in 5 steps</div>
+      <div style="font-size:13px;color:#1B2A4A;line-height:1.9">
+        <div style="display:flex;gap:10px;margin-bottom:10px;align-items:flex-start">
+          <span style="background:#028090;color:#fff;border-radius:999px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;margin-top:2px">1</span>
+          <span>Go to <strong>sheets.google.com</strong> → create a new blank spreadsheet → name it <em>Factory Expenses</em></span>
+        </div>
+        <div style="display:flex;gap:10px;margin-bottom:10px;align-items:flex-start">
+          <span style="background:#028090;color:#fff;border-radius:999px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;margin-top:2px">2</span>
+          <span>In the sheet, click <strong>Extensions → Apps Script</strong></span>
+        </div>
+        <div style="display:flex;gap:10px;margin-bottom:10px;align-items:flex-start">
+          <span style="background:#028090;color:#fff;border-radius:999px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;margin-top:2px">3</span>
+          <span>Delete all existing code → paste the entire contents of <strong>apps_script.js</strong> (provided separately) → click <strong>Save</strong></span>
+        </div>
+        <div style="display:flex;gap:10px;margin-bottom:10px;align-items:flex-start">
+          <span style="background:#028090;color:#fff;border-radius:999px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;margin-top:2px">4</span>
+          <span>Click <strong>Deploy → New deployment → Web app</strong> → set "Who has access" to <strong>Anyone</strong> → click <strong>Deploy</strong> → copy the Web App URL</span>
+        </div>
+        <div style="display:flex;gap:10px;align-items:flex-start">
+          <span style="background:#028090;color:#fff;border-radius:999px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;margin-top:2px">5</span>
+          <span>Paste the URL above → click <strong>Save</strong> → then <strong>Sync to Sheet</strong> anytime to push all expenses to Google Sheets</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Monthly budget</div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Monthly budget (₹)</div>
+          <div class="setting-desc">Set total monthly petty cash budget for the owner dashboard</div>
+        </div>
+        <div class="setting-input">
+          <input type="number" id="budget-input" placeholder="e.g. 50000" min="0" style="width:100%;padding:8px 10px;border:1px solid #D1D9E0;border-radius:7px;font-size:13px">
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn-primary" onclick="saveBudget()">Save budget</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Data management</div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Clear all local data</div>
+          <div class="setting-desc">Permanently deletes all expenses from this browser</div>
+        </div>
+        <button class="btn-sm btn-reject" style="padding:7px 14px;font-size:12px" onclick="clearAll()">Clear all data</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ADVANCE MODAL -->
+<div class="modal-overlay" id="advance-modal">
+  <div class="modal">
+    <div class="modal-header"><h3>Give cash advance</h3><button class="modal-close" onclick="closeAdvanceModal()">✕</button></div>
+    <div class="form-row r2" style="margin-bottom:10px">
+      <div class="fg"><label>Staff name *</label><input type="text" id="adv-staff" placeholder="Staff name"></div>
+      <div class="fg"><label>Location *</label>
+        <select id="adv-location"><option value="Vijay Nagar">Vijay Nagar</option><option value="Lal Kuan">Lal Kuan</option></select>
+      </div>
+    </div>
+    <div class="form-row r2" style="margin-bottom:10px">
+      <div class="fg"><label>Amount (₹) *</label><input type="number" id="adv-amount" placeholder="0" min="0"></div>
+      <div class="fg"><label>Date *</label><input type="date" id="adv-date"></div>
+    </div>
+    <div class="form-row" style="margin-bottom:10px">
+      <div class="fg"><label>Notes</label><input type="text" id="adv-notes" placeholder="Optional notes"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-ghost" onclick="closeAdvanceModal()">Cancel</button>
+      <button class="btn-primary" onclick="saveAdvance()">Save advance</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <h3>Edit Expense</h3>
+      <button class="modal-close" onclick="closeEditModal()">✕</button>
+    </div>
+    <div id="edit-body">
+      <input type="hidden" id="edit-id">
+      <div class="form-row r3" style="margin-bottom:10px">
+        <div class="fg"><label>Date *</label><input type="date" id="edit-date"></div>
+        <div class="fg"><label>Location *</label>
+          <select id="edit-location"><option value="Vijay Nagar">Vijay Nagar</option><option value="Lal Kuan">Lal Kuan</option></select>
+        </div>
+        <div class="fg"><label>Category *</label>
+          <select id="edit-cat" onchange="toggleEditFields()">
+            <option value="fooding">Fooding</option>
+            <option value="porter">Porter</option>
+            <option value="rider">Conveyance (Rider)</option>
+            <option value="spare">Machine Spare</option>
+            <option value="medical">Medical / First Aid</option>
+            <option value="housekeeping">Housekeeping</option>
+            <option value="stationery">Stationery</option>
+            <option value="cng">CNG</option>
+            <option value="toll">Toll Tax</option>
+            <option value="office">Office Expense</option>
+            <option value="other">Others</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row r2" id="edit-conv-row" style="display:none;margin-bottom:10px">
+        <div class="fg"><label>From Location</label><input type="text" id="edit-from" placeholder="e.g. Factory Gate"></div>
+        <div class="fg"><label>To Location</label><input type="text" id="edit-to" placeholder="e.g. District Office"></div>
+      </div>
+      <div class="form-row r2" id="edit-rider-row" style="display:none;margin-bottom:10px">
+        <div class="fg"><label>Rider Name</label><input type="text" id="edit-rider" placeholder="e.g. Suresh Yadav"></div>
+        <div class="fg"><label>Vehicle Number</label><input type="text" id="edit-vehicle" placeholder="e.g. UP32 AB 1234"></div>
+      </div>
+      <div class="form-row" style="margin-bottom:10px">
+        <div class="fg"><label>Amount (₹) *</label><input type="number" id="edit-amount" min="0"></div>
+      </div>
+      <div class="form-row" style="margin-bottom:10px">
+        <div class="fg"><label>Description *</label><input type="text" id="edit-desc" placeholder="Brief description"></div>
+      </div>
+      <div id="edit-vendor-section">
+        <div class="form-row r2" style="margin-bottom:10px">
+          <div class="fg"><label id="edit-lbl-vname">Vendor Name</label><input type="text" id="edit-vname" placeholder="e.g. Sharma Stationery"></div>
+          <div class="fg"><label id="edit-lbl-vphone">Vendor Contact</label><input type="text" id="edit-vphone" placeholder="Phone Number"></div>
+        </div>
+        <div class="form-row r2" style="margin-bottom:10px">
+          <div class="fg"><label id="edit-lbl-vaddr">Vendor Address</label><input type="text" id="edit-vaddr" placeholder="Shop / Area Name"></div>
+          <div class="fg"><label>GST / Invoice Number</label><input type="text" id="edit-vinv" placeholder="Optional"></div>
+        </div>
+      </div>
+      <div class="form-row" style="margin-bottom:10px">
+        <div class="fg">
+          <label>Photo Proof * <span style="font-size:11px;color:#94A3B8">(existing photos kept if no new upload)</span></label>
+          <div class="photo-box" onclick="document.getElementById('edit-photo').click()" style="padding:12px">
+            <p style="margin:0">Tap to replace photos</p>
+          </div>
+          <input type="file" id="edit-photo" accept="image/*" multiple style="display:none" onchange="handleEditPhotos(event)">
+          <div class="thumb-wrap" id="edit-thumbs"></div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn-ghost" onclick="closeEditModal()">Cancel</button>
+        <button class="btn-primary" onclick="saveEdit()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="detail-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="m-title">Detail</h3>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div id="m-body"></div>
+  </div>
+</div>
+
+<script>
+let expenses = [];
+let filterCat = 'all';
+let photoData = [];
+let sheetUrl = 'https://script.google.com/macros/s/AKfycbz7_JceElnyO5nLgWv2-6XgqPhFqDWVH46U7q3CCf487nABrGO3mUahw2YvdVQV3lan/exec'; // hardcoded default
+
+const CATS = {
+  fooding:      { label: 'Fooding',              cls: 'b-fooding' },
+  porter:       { label: 'Porter',               cls: 'b-porter' },
+  rider:        { label: 'Conveyance (Rider)',   cls: 'b-rider' },
+  spare:        { label: 'Machine Spare',         cls: 'b-spare' },
+  medical:      { label: 'Medical / First Aid',  cls: 'b-medical' },
+  housekeeping: { label: 'Housekeeping',         cls: 'b-housekeeping' },
+  stationery:   { label: 'Stationery',           cls: 'b-stationery' },
+  cng:          { label: 'CNG',                  cls: 'b-cng' },
+  toll:         { label: 'Toll Tax',              cls: 'b-toll' },
+  office:       { label: 'Office Expense',        cls: 'b-office' },
+  other:        { label: 'Others',               cls: 'b-other' }
+};
+
+function todayStr() { return new Date().toISOString().split('T')[0]; }
+
+function autoDetectRole() {
+  const name = document.getElementById('login-name').value.trim().toLowerCase();
+  const roleEl = document.getElementById('login-role');
+  const roleRow = document.getElementById('login-role-row');
+  if(name === 'vijay' || name === 'ankit') {
+    roleRow.style.display = 'none';
+  } else {
+    roleRow.style.display = 'block';
+  }
+}
+
+let currentUser = '';
+let currentRole = 'employee';
+let monthlyBudget = 0;
+let advances = [];
+let expenseCounter = 0;
+let ownerView = 'summary';
+
+function init() {
+  const dateEl = document.getElementById('i-date');
+  if(dateEl){ dateEl.value = todayStr(); dateEl.max = todayStr(); }
+  try {
+    const s = localStorage.getItem('fpe_v4'); if (s) { try { expenses = JSON.parse(s); } catch(pe){ expenses=[]; } }
+    sheetUrl = localStorage.getItem('fpe_sheet_url') || 'https://script.google.com/macros/s/AKfycbz7_JceElnyO5nLgWv2-6XgqPhFqDWVH46U7q3CCf487nABrGO3mUahw2YvdVQV3lan/exec';
+    document.getElementById('sheet-url').value = sheetUrl;
+    currentUser = localStorage.getItem('fpe_username') || '';
+    currentRole = localStorage.getItem('fpe_role') || 'employee';
+    monthlyBudget = parseFloat(localStorage.getItem('fpe_budget')||'0');
+    const bi = document.getElementById('budget-input'); if(bi && monthlyBudget) bi.value = monthlyBudget;
+    const adv = localStorage.getItem('fpe_advances'); if(adv) try{ advances = JSON.parse(adv); }catch(e2){}
+    expenseCounter = parseInt(localStorage.getItem('fpe_counter')||'0');
+  } catch(e) {}
+  if (!currentUser) {
+    showLoginScreen();
+  } else {
+    document.getElementById('i-staff').value = currentUser;
+    document.getElementById('user-name-display').textContent = currentUser + ' (' + currentRole + ')';
+    setupTabsForRole(currentRole);
+    if(currentRole === 'owner') { managerUnlocked = true; }
+    updateApprovalTitle();
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('main-app').style.display = 'block';
+    toggleFields();
+    renderAll();
+    updateSyncStatus();
+    if(sheetUrl) {
+      if(currentRole === 'owner' || currentRole === 'supervisor') {
+        pullAllFromSheet().then(()=>renderAll());
+      } else {
+        pullFromSheet();
+      }
+    }
+  }
+}
+
+function showLoginScreen() {
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('main-app').style.display = 'none';
+}
+
+function loginUser() {
+  const name = document.getElementById('login-name').value.trim();
+  if (!name) { alert('Please enter your name.'); return; }
+
+  const nameLower = name.toLowerCase();
+  let assignedRole = document.getElementById('login-role').value;
+
+  // PIN check for Vijay (supervisor)
+  if (nameLower === 'vijay') {
+    const pin = prompt('Enter supervisor PIN:');
+    if (btoa(pin) !== btoa('4465')) { alert('Incorrect PIN. Access denied.'); return; }
+    assignedRole = 'supervisor';
+  }
+  // PIN check for Ankit (owner)
+  else if (nameLower === 'ankit') {
+    const pin = prompt('Enter owner PIN:');
+    if (btoa(pin) !== btoa('2204')) { alert('Incorrect PIN. Access denied.'); return; }
+    assignedRole = 'owner';
+  }
+
+  currentUser = name;
+  currentRole = assignedRole;
+  localStorage.setItem('fpe_username', name);
+  localStorage.setItem('fpe_role', assignedRole);
+
+  document.getElementById('i-staff').value = name;
+  const dateEl = document.getElementById('i-date');
+  if(dateEl){ dateEl.value = todayStr(); dateEl.max = todayStr(); }
+  document.getElementById('user-name-display').textContent = name + ' (' + assignedRole + ')';
+  setupTabsForRole(assignedRole);
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('main-app').style.display = 'block';
+  toggleFields();
+
+  if (assignedRole === 'owner') {
+    managerUnlocked = true;
+    updateApprovalTitle();
+  }
+
+  updateSyncStatus();
+  if (sheetUrl) {
+    if (assignedRole === 'owner' || assignedRole === 'supervisor') {
+      pullAllFromSheet().then(() => { renderAll(); });
+    } else {
+      pullFromSheet();
+    }
+  } else {
+    renderAll();
+  }
+
+  // Default tab based on role
+  if (assignedRole === 'owner') {
+    showTab('owner', document.getElementById('tab-btn-owner'));
+  } else if (assignedRole === 'supervisor') {
+    showTab('approval', document.getElementById('tab-btn-approval'));
+  } else {
+    showTab('add', document.getElementById('tab-btn-add'));
+  }
+}
+
+function setupTabsForRole(role) {
+  // Employee: Add, Log only
+  // Supervisor: Add, Log, Approval queue
+  // Owner: Log, Approval queue, Owner dashboard, Settings (no Add tab)
+  document.getElementById('tab-btn-add').style.display = role === 'owner' ? 'none' : 'flex';
+  document.getElementById('tab-btn-approval').style.display = (role === 'supervisor' || role === 'owner') ? 'flex' : 'none';
+  document.getElementById('tab-btn-owner').style.display = role === 'owner' ? 'flex' : 'none';
+  document.getElementById('tab-btn-settings').style.display = role === 'owner' ? 'flex' : 'none';
+}
+
+function switchUser() {
+  if (!confirm('Switch user? This will log you out.')) return;
+  currentUser = '';
+  currentRole = 'employee';
+  managerUnlocked = false;
+  localStorage.removeItem('fpe_username');
+  localStorage.removeItem('fpe_role');
+  showLoginScreen();
+}
+
+function save() { try { localStorage.setItem('fpe_v4', JSON.stringify(expenses)); } catch(e) {} }
+
+let autoRefreshTimer = null;
+
+function showTab(name, el) {
+  ['add','log','approval','owner','settings'].forEach(t => {
+    document.getElementById('tab-' + t).style.display = t === name ? 'block' : 'none';
+  });
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderAll();
+  if((name==='owner' || name==='approval') && sheetUrl) {
+    pullAllFromSheet().then(()=>renderAll());
+  }
+  // Auto-refresh approval tab every 60 seconds
+  if(autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; }
+  if(name==='approval' && sheetUrl) {
+    autoRefreshTimer = setInterval(()=>{
+      pullAllFromSheet().then(()=>renderAll());
+    }, 60000);
+  }
+}
+
+const VENDOR_OPTIONAL_CATS = ['fooding','rider','cng','toll'];
+function vendorRequired() {
+  return !VENDOR_OPTIONAL_CATS.includes(document.getElementById('i-cat').value);
+}
+function toggleFields() {
+  const cat = document.getElementById('i-cat').value;
+  document.getElementById('conv-row').style.display = (cat==='rider'||cat==='toll') ? 'grid' : 'none';
+  document.getElementById('rider-row').style.display = cat==='rider' ? 'grid' : 'none';
+  const req = vendorRequired();
+  const star = req ? ' *' : '';
+  const opt = req ? '' : '(optional for this category)';
+  document.getElementById('lbl-vname').textContent = 'Vendor Name' + star;
+  document.getElementById('lbl-vphone').textContent = 'Vendor Contact' + star;
+  document.getElementById('lbl-vaddr').textContent = 'Vendor Address' + star;
+  document.getElementById('vendor-optional').textContent = opt;
+}
+
+function handlePhotos(e) {
+  const files = Array.from(e.target.files).slice(0,3);
+  photoData = [];
+  const wrap = document.getElementById('thumbs');
+  wrap.innerHTML = '';
+  files.forEach(f => {
+    const r = new FileReader();
+    r.onload = ev => {
+      photoData.push(ev.target.result);
+      const img = document.createElement('img');
+      img.src = ev.target.result; img.className = 'thumb';
+      img.onclick = () => showPhoto(ev.target.result);
+      wrap.appendChild(img);
+    };
+    r.readAsDataURL(f);
+  });
+}
+
+function showPhoto(src) {
+  document.getElementById('m-title').textContent = 'Photo Proof';
+  document.getElementById('m-body').innerHTML = `<img src="${src}" style="width:100%;border-radius:8px">`;
+  document.getElementById('detail-modal').classList.add('open');
+}
+
+function addExpense() {
+  const staff  = document.getElementById('i-staff').value.trim();
+  const date   = document.getElementById('i-date').value;
+  const cat    = document.getElementById('i-cat').value;
+  const amount = parseFloat(document.getElementById('i-amount').value);
+  const desc   = document.getElementById('i-desc').value.trim();
+  const vname  = document.getElementById('i-vname').value.trim();
+  const vphone = document.getElementById('i-vphone').value.trim();
+  const vaddr  = document.getElementById('i-vaddr').value.trim();
+  if (!staff)  { alert('Please enter staff name.'); return; }
+  if (!date)   { alert('Please select a date.'); return; }
+  if (!amount || amount<=0) { alert('Please enter a valid amount.'); return; }
+  if (!desc)   { alert('Please enter a description.'); return; }
+  if (vendorRequired()) {
+    if (!vname)  { alert('Vendor name is required for this category.'); return; }
+    if (!vphone) { alert('Vendor Contact is required for this category.'); return; }
+    if (!/^[0-9]{10}$/.test(vphone.replace(/\s/g,''))) { alert('Vendor Contact must be a 10-digit phone number.'); return; }
+    if (!/^[0-9]{10}$/.test(vphone.replace(/\s/g,''))) { alert('Vendor Contact must be a 10-digit phone number.'); return; }
+    if (!vaddr)  { alert('Vendor Address is required for this category.'); return; }
+  }
+  if (!photoData.length) { alert('Photo Proof is compulsory. Please upload at least one photo.'); return; }
+  // Duplicate detection
+  const dup = expenses.find(e => e.staff===staff && e.date===date && e.cat===cat && e.amount===amount && e.status!=='rejected');
+  if(dup) {
+    if(!confirm(`Warning: You already submitted a ₹${amount} ${CATS[cat]?.label||cat} expense on ${fmtDate(date)}. Submit anyway?`)) return;
+  }
+
+  // Re-read counter from storage to handle multiple tabs
+  expenseCounter = parseInt(localStorage.getItem('fpe_counter')||'0') + 1;
+  localStorage.setItem('fpe_counter', expenseCounter);
+  const refNum = 'APL-' + new Date().getFullYear() + '-' + String(expenseCounter).padStart(4,'0');
+  const location = document.getElementById('i-location').value;
+  expenses.unshift({
+    id: Date.now(), ref: refNum, staff, role: currentRole, location, date, cat, amount, desc,
+    from:    document.getElementById('i-from').value.trim(),
+    to:      document.getElementById('i-to').value.trim(),
+    rider:   document.getElementById('i-rider').value.trim(),
+    vehicle: document.getElementById('i-vehicle').value.trim(),
+    vname,
+    vphone,
+    vaddr,
+    vinv:    document.getElementById('i-vinv').value.trim(),
+    photos:  [...photoData],
+    status:  (currentRole === 'supervisor' && amount <= 2000) ? 'auto-approved' : 'pending',
+    submittedAt: new Date().toISOString()
+  });
+  const newExp = expenses[0];
+  save();
+  pushOne(newExp);
+  clearForm();
+  renderAll();
+  if(currentRole === 'supervisor' && newExp.amount <= 2000) {
+    showGlobalNotice('Expense submitted and auto-approved (under ₹2,000).', 'success');
+    showTab('log', document.querySelectorAll('.tab')[1]);
+  } else {
+    showGlobalNotice('Expense submitted — pending approval.', 'success');
+    showTab('log', document.querySelectorAll('.tab')[1]);
+  }
+}
+
+function clearForm() {
+  ['i-staff','i-amount','i-desc','i-from','i-to','i-rider','i-vehicle','i-vname','i-vphone','i-vaddr','i-vinv'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.value = '';
+  });
+  const dateEl = document.getElementById('i-date');
+  if(dateEl){ dateEl.value = todayStr(); dateEl.max = todayStr(); }
+  document.getElementById('i-cat').value = 'fooding';
+  const locEl = document.getElementById('i-location'); if(locEl) locEl.selectedIndex = 0;
+  toggleFields();
+  photoData = [];
+  document.getElementById('thumbs').innerHTML = '';
+  document.getElementById('i-photo').value = '';
+}
+
+function setFilter(cat, btn) {
+  filterCat = cat;
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  renderLog();
+}
+
+function approve(id) {
+  id = typeof id === 'string' ? parseInt(id) : id;
+  const e = expenses.find(x=>x.id===id||String(x.id)===String(id));
+  if(e){ e.status='approved'; e.approvedAt=new Date().toISOString(); e.approvedBy=currentUser; }
+  save(); pushOne(e); renderAll(); showNotice('appr-notice','Approved successfully.','success');
+}
+
+function reject(id) {
+  id = typeof id === 'string' ? parseInt(id) : id;
+  const remark = prompt('Reason for rejection (will be shown to staff):');
+  if(remark === null) return; // cancelled
+  const e = expenses.find(x=>x.id===id||String(x.id)===String(id));
+  if(e){
+    e.status='rejected';
+    e.rejectedAt=new Date().toISOString();
+    e.rejectionRemark = remark.trim() || 'No reason given';
+    e.approvedBy = currentUser;
+  }
+  save(); pushOne(e); renderAll(); showNotice('appr-notice','Expense rejected — remark saved.','info');
+}
+
+function showNotice(elId, msg, type='success') {
+  const el = document.getElementById(elId);
+  if(!el) return;
+  el.textContent = msg; el.className = `notice ${type}`; el.style.display = 'block';
+  setTimeout(()=>el.style.display='none', 3000);
+}
+
+function showGlobalNotice(msg, type='success') {
+  const el = document.getElementById('global-notice');
+  el.textContent = msg; el.className = `notice ${type}`; el.style.display = 'block';
+  setTimeout(()=>el.style.display='none', 4000);
+}
+
+function deleteExpense(id) {
+  const eCheck = expenses.find(x=>x.id===id);
+  if(eCheck && (eCheck.status==='approved'||eCheck.status==='auto-approved')) {
+    alert('Approved expenses cannot be deleted.'); return;
+  }
+  if(!confirm('Delete this expense?')) return;
+  const e = expenses.find(x=>x.id===id);
+  expenses = expenses.filter(x=>x.id!==id);
+  save(); renderAll();
+  // Push deleted status to sheet
+  if(e && sheetUrl) { e.status='deleted'; pushOne(e); }
+}
+
+function fmtDate(d) {
+  return new Date(d+'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'});
+}
+
+function renderAll() {
+  renderSummary(); renderLog(); renderApproval();
+  if(currentRole==='owner') renderOwner();
+}
+
+function renderSummary() {
+  const today = todayStr(); const month = today.slice(0,7);
+  const mine = expenses.filter(e=>e.staff===currentUser);
+  const td = mine.filter(e=>e.date===today);
+  const mn = mine.filter(e=>e.date&&e.date.startsWith(month));
+  document.getElementById('s-today').textContent = '₹'+td.reduce((s,e)=>s+e.amount,0).toLocaleString('en-IN');
+  document.getElementById('s-month').textContent = '₹'+mn.reduce((s,e)=>s+e.amount,0).toLocaleString('en-IN');
+  const myPending = mine.filter(e=>e.status==='pending').length;
+  // For supervisor: approval badge shows employee pending count
+  const approvalPending = currentRole==='supervisor'
+    ? expenses.filter(e=>(e.role==='employee'||!e.role)&&e.status==='pending').length
+    : currentRole==='owner'
+    ? expenses.filter(e=>e.role==='supervisor'&&e.status==='pending'&&e.amount>2000).length
+    : myPending;
+  document.getElementById('s-pending').textContent = myPending;
+  document.getElementById('s-approved').textContent = mine.filter(e=>(e.status==='approved'||e.status==='auto-approved')&&e.date===today).length;
+  const pb = document.getElementById('pb');
+  if(approvalPending>0){pb.textContent=approvalPending;pb.style.display='inline';}else pb.style.display='none';
+}
+
+function renderLog() {
+  const myExpenses = expenses.filter(e=>e.staff===currentUser);
+  const filtered = filterCat==='all' ? myExpenses : myExpenses.filter(e=>e.cat===filterCat);
+  const tb = document.getElementById('log-tbody');
+  const tf = document.getElementById('log-tfoot');
+  if(!tb) return;
+  if(filtered.length===0){tb.innerHTML='<tr><td colspan="12" class="empty-state">No expenses yet.</td></tr>';tf.innerHTML='';return;}
+  tb.innerHTML = filtered.map(e=>{
+    const cat=CATS[e.cat]||CATS.other;
+    const sb=e.status==='approved'||e.status==='auto-approved'?'b-approved':e.status==='rejected'?'b-rejected':'b-pending';
+    const ph=e.photos&&e.photos.length?`<span style="color:#028090;cursor:pointer;font-size:11px;font-weight:700" onclick="showDetail(${e.id})">View (${e.photos.length})</span>`:'<span style="color:#CBD5E1">—</span>';
+    const canEdit = e.status === 'pending' || e.status === 'rejected';
+    return `<tr>
+      <td style="font-size:11px;color:#64748B;white-space:nowrap">${e.ref||'—'}</td>
+      <td style="color:#64748B;font-size:11.5px;white-space:nowrap">${fmtDate(e.date)}</td>
+      <td style="font-weight:600">${e.staff}</td>
+      <td style="color:#64748B;font-size:11.5px">${e.location||'—'}</td>
+      <td><span class="badge ${cat.cls}">${cat.label}</span></td>
+      <td style="color:#64748B;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.desc}">${e.desc}</td>
+      <td style="color:#64748B;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.vname||'—'}</td>
+      <td style="text-align:right;font-weight:700">₹${e.amount.toLocaleString('en-IN')}</td>
+      <td><span class="badge ${sb}">${e.status==="auto-approved"?"approved (auto)":e.status}</span>${e.status==="rejected"&&e.rejectionRemark?`<div style="font-size:10px;color:#991B1B;margin-top:2px">${e.rejectionRemark}</div>`:""}</td>
+      <td>${ph}</td>
+      <td style="white-space:nowrap">
+        ${canEdit ? `<button class="del-btn" style="color:#028090" onclick="openEditModal(${e.id})" title="Edit">✎</button>` : ''}
+        <button class="del-btn" onclick="deleteExpense(${e.id})" title="Delete">✕</button>
+      </td>
+    </tr>`;
+  }).join('');
+  const tot = filtered.reduce((s,e)=>s+e.amount,0);
+  tf.innerHTML = `<tr class="tfoot-row"><td colspan="7" style="font-size:12px;padding:9px 10px">Total — ${filtered.length} entries</td><td style="text-align:right;padding:9px 10px">₹${tot.toLocaleString('en-IN')}</td><td colspan="3"></td></tr>`;
+}
+
+function renderApproval() {
+  const allPending = expenses.filter(e=>e.status==='pending');
+  let pending = [];
+  if (currentRole === 'owner') {
+    // Owner sees supervisor expenses above ₹2000
+    pending = allPending.filter(e => e.role === 'supervisor' && e.amount > 2000);
+  } else if (currentRole === 'supervisor') {
+    // Supervisor sees all employee expenses
+    pending = allPending.filter(e => e.role === 'employee' || !e.role);
+  }
+  const tb = document.getElementById('appr-tbody');
+  if(!tb) return;
+  const label = currentRole === 'owner' ? 'supervisor (above ₹2,000)' : 'employee';
+  if(pending.length===0){tb.innerHTML=`<tr><td colspan="8" class="empty-state">No pending ${label} expenses — all clear!</td></tr>`;return;}
+  tb.innerHTML = pending.map(e=>{
+    const cat=CATS[e.cat]||CATS.other;
+    const ph=e.photos&&e.photos.length?`<span style="color:#028090;cursor:pointer;font-size:11px;font-weight:700" onclick="showDetail(${e.id})">View (${e.photos.length})</span>`:'<span style="color:#CBD5E1">—</span>';
+    const ageDays = e.submittedAt ? Math.floor((Date.now()-new Date(e.submittedAt))/(1000*60*60*24)) : 0;
+    const ageStyle = ageDays>=2 ? 'color:#991B1B;font-weight:700' : 'color:#64748B';
+    const ageLabel = ageDays===0?'Today':ageDays===1?'1 day':`${ageDays}d ⚠`;
+    return `<tr>
+      <td><input type="checkbox" class="appr-chk" data-id="${e.id}"></td>
+      <td style="font-size:11px;color:#64748B;white-space:nowrap">${e.ref||'—'}</td>
+      <td style="color:#64748B;font-size:11.5px;white-space:nowrap">${fmtDate(e.date)}</td>
+      <td style="font-weight:600">${e.staff}</td>
+      <td style="color:#64748B;font-size:11.5px">${e.location||'—'}</td>
+      <td><span class="badge ${cat.cls}">${cat.label}</span></td>
+      <td style="color:#64748B;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.desc}">${e.desc}</td>
+      <td style="color:#64748B;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.vname||'—'}</td>
+      <td style="text-align:right;font-weight:700">₹${e.amount.toLocaleString('en-IN')}</td>
+      <td style="${ageStyle};font-size:11px;white-space:nowrap">${ageLabel}</td>
+      <td>${ph}</td>
+      <td style="white-space:nowrap">
+        <button class="btn-sm btn-approve" onclick="approve(${e.id})" style="margin-right:4px">Approve</button>
+        <button class="btn-sm btn-reject" onclick="reject(${e.id})">Reject</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function onPeriodChange() {
+  const period = document.getElementById('owner-period').value;
+  const cr = document.getElementById('custom-range');
+  cr.style.display = period === 'custom' ? 'flex' : 'none';
+  // Set default dates for custom range
+  if(period === 'custom') {
+    const today = todayStr();
+    const from = document.getElementById('range-from');
+    const to = document.getElementById('range-to');
+    if(!from.value) from.value = today.slice(0,7) + '-01';
+    if(!to.value) to.value = today;
+  }
+  renderOwner();
+}
+
+function getFilteredByPeriod() {
+  const period = document.getElementById('owner-period')?.value || 'month';
+  // Exclude deleted expenses from all reports
+  const today = todayStr();
+  const now = new Date();
+  return expenses.filter(e => {
+    if (!e.date) return false;
+    if (e.status === 'deleted') return false;
+    if (period==='today') return e.date===today;
+    if (period==='week') {
+      const d = new Date(e.date+'T00:00:00');
+      const diff = (now - d)/(1000*60*60*24);
+      return diff>=0 && diff<7;
+    }
+    if (period==='month') return e.date.startsWith(today.slice(0,7));
+    if (period==='custom') {
+      const from = document.getElementById('range-from')?.value;
+      const to = document.getElementById('range-to')?.value;
+      if(!from || !to) return true;
+      return e.date >= from && e.date <= to;
+    }
+    return true;
+  });
+}
+
+function renderOwner() {
+  const all = getFilteredByPeriod();
+  const approved = all.filter(e=>e.status==='approved'||e.status==='auto-approved');
+  const total = all.reduce((s,e)=>s+e.amount,0);
+  const approvedTotal = approved.reduce((s,e)=>s+e.amount,0);
+  const pending = all.filter(e=>e.status==='pending').length;
+
+  // Metrics
+  const om = document.getElementById('owner-metrics');
+  if(!om || currentRole !== 'owner') return;
+  om.innerHTML = `
+    <div class="dash-metric"><div class="dash-num">₹${total.toLocaleString('en-IN')}</div><div class="dash-lbl">Total submitted</div></div>
+    <div class="dash-metric"><div class="dash-num" style="color:#10B981">₹${approvedTotal.toLocaleString('en-IN')}</div><div class="dash-lbl">Approved amount</div></div>
+    <div class="dash-metric"><div class="dash-num" style="color:#F59E0B">${pending}</div><div class="dash-lbl">Pending approval</div></div>
+    <div class="dash-metric"><div class="dash-num" style="color:#6366F1">${all.length}</div><div class="dash-lbl">Total entries</div></div>
+    <div class="dash-metric"><div class="dash-num" style="color:#EF4444">₹${all.filter(e=>e.status==='rejected').reduce((s,e)=>s+e.amount,0).toLocaleString('en-IN')}</div><div class="dash-lbl">Rejected amount</div></div>
+    <div class="dash-metric"><div class="dash-num" style="color:#64748B">${[...new Set(all.map(e=>e.staff))].length}</div><div class="dash-lbl">Staff members</div></div>
+    ${monthlyBudget>0?`<div class="dash-metric"><div class="dash-num" style="color:${(monthlyBudget-approvedTotal)<0?'#EF4444':'#028090'}">₹${Math.max(0,monthlyBudget-approvedTotal).toLocaleString('en-IN')}</div><div class="dash-lbl">Budget remaining</div></div><div class="dash-metric"><div class="dash-num" style="color:#64748B">₹${monthlyBudget.toLocaleString('en-IN')}</div><div class="dash-lbl">Monthly budget</div></div>`:''}
+  `;
+
+  // Category bars
+  const catTotals = {};
+  all.forEach(e=>{ catTotals[e.cat]=(catTotals[e.cat]||0)+e.amount; });
+  const catMax = Math.max(...Object.values(catTotals),1);
+  const oc = document.getElementById('owner-cat');
+  if(oc) oc.innerHTML = Object.entries(catTotals).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`
+    <div class="bar-wrap">
+      <div class="bar-label"><span>${CATS[k]?.label||k}</span><span>₹${v.toLocaleString('en-IN')}</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.round(v/catMax*100)}%"></div></div>
+    </div>`).join('') || '<p style="font-size:13px;color:#94A3B8">No data</p>';
+
+  // Staff bars
+  const staffTotals = {};
+  all.forEach(e=>{ staffTotals[e.staff]=(staffTotals[e.staff]||0)+e.amount; });
+  const staffMax = Math.max(...Object.values(staffTotals),1);
+  const colors = ['#028090','#6366F1','#F59E0B','#10B981','#EF4444','#EC4899'];
+  const od = document.getElementById('owner-dept');
+  if(od) od.innerHTML = Object.entries(staffTotals).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([k,v],i)=>`
+    <div class="bar-wrap">
+      <div class="bar-label"><span>${k}</span><span>₹${v.toLocaleString('en-IN')}</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.round(v/staffMax*100)}%;background:${colors[i%colors.length]}"></div></div>
+    </div>`).join('') || '<p style="font-size:13px;color:#94A3B8">No data</p>';
+
+  // Daily chart — last 14 days
+  const daily = {};
+  for(let i=13;i>=0;i--){
+    const d = new Date(); d.setDate(d.getDate()-i);
+    daily[d.toISOString().split('T')[0]] = 0;
+  }
+  expenses.forEach(e=>{ if(daily[e.date]!==undefined) daily[e.date]+=e.amount; });
+  const maxDaily = Math.max(...Object.values(daily),1);
+  const od2 = document.getElementById('owner-daily');
+  if(od2) od2.innerHTML = `<div style="display:flex;align-items:flex-end;gap:4px;height:100px;padding-bottom:24px;min-width:560px">` +
+    Object.entries(daily).map(([d,v])=>{
+      const h = Math.max(Math.round(v/maxDaily*80),v>0?4:0);
+      const label = new Date(d+'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
+      return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+        <div style="font-size:9px;color:#64748B;writing-mode:vertical-rl;transform:rotate(180deg);height:22px;overflow:hidden">${v>0?'₹'+v.toLocaleString('en-IN'):''}</div>
+        <div style="width:100%;background:${v>0?'#028090':'#E2EAF0'};height:${h}px;border-radius:3px 3px 0 0;min-height:2px"></div>
+        <div style="font-size:9px;color:#94A3B8;white-space:nowrap">${label}</div>
+      </div>`;
+    }).join('') + '</div>';
+
+  // Staff monthly summary
+  const sst = document.getElementById('staff-summary-tbody');
+  if(sst) {
+    const staffMap = {};
+    all.forEach(e=>{
+      if(!staffMap[e.staff]) staffMap[e.staff] = {submitted:0,approved:0,pending:0,rejected:0};
+      staffMap[e.staff].submitted += e.amount;
+      if(e.status==='approved'||e.status==='auto-approved') staffMap[e.staff].approved += e.amount;
+      else if(e.status==='pending') staffMap[e.staff].pending += e.amount;
+      else if(e.status==='rejected') staffMap[e.staff].rejected += e.amount;
+    });
+    sst.innerHTML = Object.entries(staffMap).sort((a,b)=>b[1].submitted-a[1].submitted).map(([name,s])=>`
+      <tr>
+        <td style="font-weight:600">${name}</td>
+        <td style="text-align:right">₹${s.submitted.toLocaleString('en-IN')}</td>
+        <td style="text-align:right;color:#065F46">₹${s.approved.toLocaleString('en-IN')}</td>
+        <td style="text-align:right;color:#92400E">₹${s.pending.toLocaleString('en-IN')}</td>
+        <td style="text-align:right;color:#991B1B">₹${s.rejected.toLocaleString('en-IN')}</td>
+      </tr>`).join('') || '<tr><td colspan="5" class="empty-state">No data</td></tr>';
+  }
+
+  // Owner full table
+  const ot = document.getElementById('owner-tbody');
+  const otf = document.getElementById('owner-tfoot');
+  if(!ot) return;
+  if(!all.length){ot.innerHTML='<tr><td colspan="8" class="empty-state">No expenses in this period.</td></tr>';otf.innerHTML='';return;}
+  ot.innerHTML = all.map(e=>{
+    const cat=CATS[e.cat]||CATS.other;
+    const sb=e.status==='approved'||e.status==='auto-approved'?'b-approved':e.status==='rejected'?'b-rejected':'b-pending';
+    return `<tr>
+      <td style="font-size:11px;color:#64748B;white-space:nowrap">${e.ref||'—'}</td>
+      <td style="color:#64748B;font-size:11.5px;white-space:nowrap">${fmtDate(e.date)}</td>
+      <td style="font-weight:600">${e.staff}</td>
+      <td style="color:#64748B;font-size:11.5px">${e.location||'—'}</td>
+      <td><span class="badge ${cat.cls}">${cat.label}</span></td>
+      <td style="color:#64748B">${e.desc}</td>
+      <td style="color:#64748B">${e.vname||'—'}</td>
+      <td style="text-align:right;font-weight:700">₹${e.amount.toLocaleString('en-IN')}</td>
+      <td><span class="badge ${sb}">${e.status}</span></td>
+    </tr>`;
+  }).join('');
+  const tot2 = all.reduce((s,e)=>s+e.amount,0);
+  otf.innerHTML = `<tr class="tfoot-row"><td colspan="5" style="font-size:12px;padding:9px 10px">Total — ${all.length} entries</td><td style="text-align:right;padding:9px 10px">₹${tot2.toLocaleString('en-IN')}</td><td></td></tr>`;
+}
+
+function showDetail(id) {
+  const e = expenses.find(x=>x.id===id); if(!e) return;
+  const cat=CATS[e.cat]||CATS.other;
+  const sb=e.status==='approved'?'b-approved':e.status==='rejected'?'b-rejected':'b-pending';
+  let html = `
+    <div class="detail-row"><span class="dl">Staff</span><span class="dr">${e.staff}</span></div>
+    <div class="detail-row"><span class="dl">Date</span><span class="dr">${fmtDate(e.date)}</span></div>
+    <div class="detail-row"><span class="dl">Category</span><span class="dr"><span class="badge ${cat.cls}">${cat.label}</span></span></div>
+    <div class="detail-row"><span class="dl">Amount</span><span class="dr">₹${e.amount.toLocaleString('en-IN')}</span></div>
+    <div class="detail-row"><span class="dl">Description</span><span class="dr">${e.desc}</span></div>`;
+  if(e.from||e.to) html+=`<div class="detail-row"><span class="dl">Route</span><span class="dr">${e.from||'—'} → ${e.to||'—'}</span></div>`;
+  if(e.rider) html+=`<div class="detail-row"><span class="dl">Rider</span><span class="dr">${e.rider}${e.vehicle?' ('+e.vehicle+')':''}</span></div>`;
+  if(e.vname) html+=`<div class="detail-row"><span class="dl">Vendor</span><span class="dr">${e.vname}</span></div>`;
+  if(e.vphone) html+=`<div class="detail-row"><span class="dl">Contact</span><span class="dr">${e.vphone}</span></div>`;
+  if(e.vaddr) html+=`<div class="detail-row"><span class="dl">Address</span><span class="dr">${e.vaddr}</span></div>`;
+  if(e.vinv) html+=`<div class="detail-row"><span class="dl">Invoice / GST</span><span class="dr">${e.vinv}</span></div>`;
+  html+=`<div class="detail-row"><span class="dl">Status</span><span class="dr"><span class="badge ${sb}">${e.status}</span></span></div>`;
+  if(e.rejectionRemark) html+=`<div class="detail-row"><span class="dl">Rejection reason</span><span class="dr" style="color:#991B1B">${e.rejectionRemark}</span></div>`;
+  if(e.photos&&e.photos.length){
+    html+=`<div style="margin-top:14px"><div class="section-label">Photo Proof (${e.photos.length})</div><div class="photo-preview">`;
+    e.photos.forEach(p=>{ html+=`<img src="${p}" onclick="showPhoto('${p}')">`; });
+    html+=`</div></div>`;
+  }
+  if(e.status==='pending' && (currentRole==='supervisor' || currentRole==='owner')){
+    html+=`<div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
+      <button class="btn-sm btn-approve" style="padding:7px 18px;font-size:13px" onclick="approve(${e.id});closeModal()">Approve</button>
+      <button class="btn-sm btn-reject" style="padding:7px 18px;font-size:13px" onclick="reject(${e.id});closeModal()">Reject</button>
+    </div>`;
+  }
+  document.getElementById('m-title').textContent = e.desc;
+  document.getElementById('m-body').innerHTML = html;
+  document.getElementById('detail-modal').classList.add('open');
+}
+
+function closeModal() { document.getElementById('detail-modal').classList.remove('open'); }
+document.getElementById('detail-modal').addEventListener('click', function(ev){ if(ev.target===this) closeModal(); });
+
+function saveSettings() {
+  sheetUrl = document.getElementById('sheet-url').value.trim();
+  localStorage.setItem('fpe_sheet_url', sheetUrl);
+  updateSyncStatus();
+  showGlobalNotice('Settings saved! Loading your expenses from sheet...','success');
+  if(sheetUrl && currentUser) pullFromSheet();
+}
+
+function updateSyncStatus() {
+  const el = document.getElementById('sync-status');
+  if(sheetUrl) {
+    el.textContent = 'Sheet connected';
+    el.style.color = '#02C39A';
+  } else {
+    el.textContent = 'No sheet connected';
+    el.style.color = '#94A3B8';
+  }
+}
+
+// Push a single expense to sheet immediately
+async function pushOne(exp) {
+  if(!sheetUrl) return;
+  const payload = {...exp, photos:[]};
+  const bodyStr = JSON.stringify({expense: payload});
+  const encoded = encodeURIComponent(bodyStr);
+  const url = sheetUrl + '?data=' + encoded;
+
+  if(url.length <= 8000) {
+    // GET request — no CORS issue, works from any origin
+    try {
+      await fetch(url);
+    } catch(e) {
+      // no-cors fallback for strict browsers
+      try { await fetch(url, {mode:'no-cors'}); } catch(e2) {}
+    }
+  } else {
+    // Payload too large — use no-cors POST with text/plain (simple request, no preflight)
+    try {
+      await fetch(sheetUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        body: bodyStr  // text/plain is a simple header — no preflight
+      });
+    } catch(e) {}
+  }
+}
+
+function formPost(bodyObj) {
+  if(!sheetUrl) return;
+  let iframe = document.getElementById('_post_frame');
+  if(!iframe){
+    iframe = document.createElement('iframe');
+    iframe.id = '_post_frame';
+    iframe.name = '_post_frame';
+    iframe.style.display = 'none';
+    iframe.style.position = 'absolute';
+    iframe.style.top = '-9999px';
+    document.body.appendChild(iframe);
+  }
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = sheetUrl;
+  form.target = '_post_frame';
+  form.style.display = 'none';
+  const input = document.createElement('input');
+  input.type = 'hidden';
+  input.name = 'payload';
+  input.value = JSON.stringify(bodyObj);
+  form.appendChild(input);
+  document.body.appendChild(form);
+  form.submit();
+  setTimeout(()=>{ try{document.body.removeChild(form);}catch(e){} }, 3000);
+}
+
+// Pull all expenses for current user from sheet (on login / refresh)
+async function pullFromSheet() {
+  if(!sheetUrl || !currentUser) return;
+  try {
+    const url = sheetUrl + '?action=getByStaff&staff=' + encodeURIComponent(currentUser);
+    const controller = new AbortController();
+    const timer = setTimeout(()=>controller.abort(), 10000);
+    const res = await fetch(url, {signal: controller.signal});
+    clearTimeout(timer);
+    const data = await res.json();
+    if(data.success && data.expenses && data.expenses.length > 0) {
+      // Merge: sheet data takes priority, keep photos from local
+      const localById = {};
+      expenses.forEach(e => localById[String(e.id)] = e);
+      const merged = data.expenses.map(se => {
+        const local = localById[String(se.id)];
+        return { ...se, photos: local ? (local.photos||[]) : [] };
+      });
+      // Keep any local expenses not yet in sheet
+      const sheetIds = new Set(data.expenses.map(e=>String(e.id)));
+      const localOnly = expenses.filter(e => !sheetIds.has(String(e.id)));
+      expenses = [...merged, ...localOnly];
+      save();
+      renderAll();
+      showGlobalNotice('Expenses loaded from sheet.', 'success');
+    } else {
+      // Silently ignore - user may have no sheet expenses yet
+    }
+  } catch(err) {
+    showGlobalNotice('Could not load from sheet — using local data.', 'info');
+  }
+}
+
+// Pull ALL expenses (for manager owner dashboard)
+async function pullAllFromSheet() {
+  if(!sheetUrl) return;
+  try {
+    const url = sheetUrl + '?action=getAll';
+    const controller = new AbortController();
+    const timer = setTimeout(()=>controller.abort(), 10000);
+    const res = await fetch(url, {signal: controller.signal});
+    clearTimeout(timer);
+    const data = await res.json();
+    if(data.success && data.expenses && data.expenses.length > 0) {
+      const localById = {};
+      expenses.forEach(e => localById[String(e.id)] = e);
+      const sheetExp = data.expenses.map(se => {
+        const local = localById[String(se.id)];
+        return { ...se, id: Number(se.id)||se.id, photos: local ? (local.photos||[]) : [] };
+      });
+      const sheetIds = new Set(data.expenses.map(e=>String(e.id)));
+      const localOnly = expenses.filter(e => !sheetIds.has(String(e.id)));
+      expenses = [...sheetExp, ...localOnly];
+      save();
+    }
+  } catch(err) { console.log('pullAll failed', err); showGlobalNotice('Could not refresh from sheet — showing local data.','info'); }
+}
+
+async function syncToSheet() {
+  if(!sheetUrl) {
+    showGlobalNotice('Please set your Google Sheet URL in Settings first.','error');
+    return;
+  }
+  const btn = document.getElementById('sync-btn');
+  btn.disabled = true; btn.textContent = 'Syncing...';
+  const payload = expenses.map(e=>({...e, photos:[]}));
+  let successCount = 0;
+
+  for(const exp of payload) {
+    const bodyStr = JSON.stringify({expense: exp});
+    try {
+      const encoded = encodeURIComponent(bodyStr);
+      const url = sheetUrl + '?data=' + encoded;
+      if(url.length <= 8000) {
+        await fetch(url);
+      } else {
+        await fetch(sheetUrl, {method:'POST', mode:'no-cors', body: bodyStr});
+      }
+      successCount++;
+    } catch(e) {
+      try { await fetch(sheetUrl, {method:'POST', mode:'no-cors', body: bodyStr}); successCount++; } catch(e2) {}
+    }
+    // Small delay to avoid rate limiting
+    await new Promise(r => setTimeout(r, 100));
+  }
+
+  const now = new Date().toLocaleTimeString('en-IN');
+  localStorage.setItem('fpe_last_sync', now);
+  showGlobalNotice(`Synced ${successCount}/${payload.length} entries. Last sync: ${now}`, 'success');
+  document.getElementById('sync-status').textContent = `Last sync: ${now}`;
+  document.getElementById('sync-status').style.color = '#02C39A';
+  btn.disabled = false; btn.textContent = 'Sync to Sheet';
+}
+
+async function testConnection() {
+  const url = document.getElementById('sheet-url').value.trim();
+  if(!url){ alert('Please enter a URL first.'); return; }
+  try {
+    const res = await fetch(url+'?ping=1');
+    const data = await res.json();
+    if(data.success) showGlobalNotice('Connection successful! Your Google Sheet is ready.','success');
+    else showGlobalNotice('Connected but unexpected response.','info');
+  } catch(e) {
+    showGlobalNotice('Connection failed — check URL and make sure access is set to "Anyone".','error');
+  }
+}
+
+function exportCSV(filteredOnly=false) {
+  const data = filteredOnly ? getFilteredByPeriod() : expenses;
+  if(!data.length){ alert('No expenses to export.'); return; }
+  const h = ['Date','Staff','Category','Description','Vendor','Contact','Address','Invoice No','Amount','Status','Rejection Reason'];
+  const rows = data.map(e=>[
+    e.date, e.staff, CATS[e.cat]?.label||e.cat, e.desc,
+    e.vname||'', e.vphone||'', e.vaddr||'', e.vinv||'',
+    e.amount, e.status, e.rejectionRemark||''
+  ]);
+  const csv = [h,...rows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const period = filteredOnly ? (document.getElementById('owner-period')?.value||'all') : 'all';
+  const url = URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'}));
+  const a = document.createElement('a'); a.href=url; a.download=`petty_expenses_${period}.csv`; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function switchOwnerView(view, btn) {
+  ownerView = view;
+  ['summary','mom','trend','advance','history'].forEach(v=>{
+    const el=document.getElementById('owner-view-'+v);
+    if(el) el.style.display = v===view?'block':'none';
+    const b=document.getElementById('odash-btn-'+v);
+    if(b) b.classList.toggle('active', v===view);
+  });
+  if(view==='mom') renderMoM();
+  if(view==='trend') renderTrend();
+  if(view==='advance') renderAdvances();
+  if(view==='history') renderHistory();
+}
+
+function renderMoM() {
+  const el = document.getElementById('mom-content'); if(!el) return;
+  const months = [];
+  for(let i=2;i>=0;i--){
+    const d=new Date(); d.setMonth(d.getMonth()-i);
+    months.push(d.toISOString().slice(0,7));
+  }
+  const labels = months.map(m=>{ const [y,mo]=m.split('-'); return new Date(y,mo-1).toLocaleString('en-IN',{month:'short',year:'2-digit'}); });
+  const totals = months.map(m=>expenses.filter(e=>e.date&&e.date.startsWith(m)).reduce((s,e)=>s+e.amount,0));
+  const approved = months.map(m=>expenses.filter(e=>e.date&&e.date.startsWith(m)&&(e.status==='approved'||e.status==='auto-approved')).reduce((s,e)=>s+e.amount,0));
+  const maxVal = Math.max(...totals,1);
+  el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px">' +
+    months.map((m,i)=>`<div style="text-align:center">
+      <div style="font-size:11px;color:#64748B;margin-bottom:6px">${labels[i]}</div>
+      <div style="background:#F1F5F9;border-radius:8px;height:100px;display:flex;align-items:flex-end;padding:4px">
+        <div style="width:100%;border-radius:6px 6px 0 0;background:#028090;height:${Math.round(totals[i]/maxVal*100)}%;min-height:4px"></div>
+      </div>
+      <div style="font-size:13px;font-weight:700;margin-top:6px">₹${totals[i].toLocaleString('en-IN')}</div>
+      <div style="font-size:11px;color:#10B981">Approved: ₹${approved[i].toLocaleString('en-IN')}</div>
+    </div>`).join('') + '</div>' +
+    '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
+    '<tr style="background:#F8FAFC"><th style="padding:8px;text-align:left">Month</th><th style="padding:8px;text-align:right">Total</th><th style="padding:8px;text-align:right">Approved</th><th style="padding:8px;text-align:right">Change</th></tr>' +
+    months.map((m,i)=>{
+      const change = i>0 ? ((totals[i]-totals[i-1])/(totals[i-1]||1)*100).toFixed(1) : '—';
+      const changeStyle = i>0 ? (totals[i]>totals[i-1]?'color:#EF4444':'color:#10B981') : '';
+      return `<tr style="border-bottom:1px solid #F1F5F9"><td style="padding:8px">${labels[i]}</td><td style="padding:8px;text-align:right;font-weight:600">₹${totals[i].toLocaleString('en-IN')}</td><td style="padding:8px;text-align:right;color:#10B981">₹${approved[i].toLocaleString('en-IN')}</td><td style="padding:8px;text-align:right;${changeStyle}">${i>0?(totals[i]>totals[i-1]?'▲':'▼')+Math.abs(change)+'%':'—'}</td></tr>`;
+    }).join('') + '</table>';
+}
+
+function renderTrend() {
+  const el = document.getElementById('trend-content'); if(!el) return;
+  const months = [];
+  for(let i=2;i>=0;i--){
+    const d=new Date(); d.setMonth(d.getMonth()-i);
+    months.push(d.toISOString().slice(0,7));
+  }
+  const labels = months.map(m=>{ const [y,mo]=m.split('-'); return new Date(y,mo-1).toLocaleString('en-IN',{month:'short'}); });
+  const catKeys = Object.keys(CATS);
+  const rows = catKeys.map(cat=>{
+    const vals = months.map(m=>expenses.filter(e=>e.cat===cat&&e.date&&e.date.startsWith(m)).reduce((s,e)=>s+e.amount,0));
+    if(vals.every(v=>v===0)) return null;
+    const trend = vals[2]>vals[1]?'▲':'▼';
+    const tColor = vals[2]>vals[1]?'#EF4444':'#10B981';
+    return `<tr style="border-bottom:1px solid #F1F5F9">
+      <td style="padding:8px"><span class="badge ${CATS[cat].cls}">${CATS[cat].label}</span></td>
+      ${vals.map(v=>`<td style="padding:8px;text-align:right;font-size:12px">₹${v.toLocaleString('en-IN')}</td>`).join('')}
+      <td style="padding:8px;text-align:center;color:${tColor};font-weight:700">${trend}</td>
+    </tr>`;
+  }).filter(Boolean);
+  el.innerHTML = `<table style="width:100%;font-size:12px;border-collapse:collapse">
+    <tr style="background:#F8FAFC"><th style="padding:8px;text-align:left">Category</th>${labels.map(l=>`<th style="padding:8px;text-align:right">${l}</th>`).join('')}<th style="padding:8px;text-align:center">Trend</th></tr>
+    ${rows.join('')}
+  </table>` || '<p style="color:#94A3B8;font-size:13px">No data</p>';
+}
+
+function openAdvanceModal() {
+  const advDateEl = document.getElementById('adv-date');
+  if(advDateEl){ advDateEl.value = todayStr(); advDateEl.max = todayStr(); }
+  document.getElementById('advance-modal').classList.add('open');
+}
+function closeAdvanceModal() { document.getElementById('advance-modal').classList.remove('open'); }
+// advance-modal close on backdrop click — registered after DOM ready
+(function(){
+  const am = document.getElementById('advance-modal');
+  if(am) am.addEventListener('click', function(ev){ if(ev.target===this) closeAdvanceModal(); });
+})();
+
+function saveAdvance() {
+  const staff = document.getElementById('adv-staff').value.trim();
+  const location = document.getElementById('adv-location').value;
+  const amount = parseFloat(document.getElementById('adv-amount').value);
+  const date = document.getElementById('adv-date').value;
+  const notes = document.getElementById('adv-notes').value.trim();
+  if(!staff){ alert('Enter staff name.'); return; }
+  if(!amount||amount<=0){ alert('Enter valid amount.'); return; }
+  const newAdv = { id:Date.now(), staff, location, amount, date, notes };
+  advances.push(newAdv);
+  localStorage.setItem('fpe_advances', JSON.stringify(advances));
+  // Sync advance to sheet as a special record
+  if(sheetUrl) pushOne({id:newAdv.id, ref:'ADV-'+newAdv.id, staff, location, date, cat:'advance', amount, desc:'Cash advance'+(notes?': '+notes:''), status:'advance', approvedBy:currentUser, role:'owner'});
+  closeAdvanceModal();
+  renderAdvances();
+  showGlobalNotice(`Advance of ₹${amount.toLocaleString('en-IN')} recorded for ${staff}.`,'success');
+}
+
+function renderAdvances() {
+  const el = document.getElementById('advance-tbody'); if(!el) return;
+  if(!advances.length){ el.innerHTML='<tr><td colspan="7" class="empty-state">No advances recorded.</td></tr>'; return; }
+  const staffExpenses = {};
+  expenses.filter(e=>e.status==='approved'||e.status==='auto-approved').forEach(e=>{ staffExpenses[e.staff] = (staffExpenses[e.staff]||0) + e.amount; });
+  const staffAdv = {};
+  advances.forEach(a=>{ staffAdv[a.staff] = (staffAdv[a.staff]||0) + a.amount; });
+  const staffList = [...new Set(advances.map(a=>a.staff))];
+  el.innerHTML = staffList.map(s=>{
+    const totalAdv = staffAdv[s]||0;
+    const totalExp = staffExpenses[s]||0;
+    const balance = totalAdv - totalExp;
+    const balStyle = balance>0?'color:#F59E0B;font-weight:700':'color:#10B981;font-weight:700';
+    const advEntries = advances.filter(a=>a.staff===s);
+    const loc = advEntries[advEntries.length-1]?.location||'—';
+    const notes = advEntries.map(a=>a.notes).filter(Boolean).join(', ');
+    return `<tr>
+      <td style="color:#64748B;font-size:11.5px">${fmtDate(advEntries[advEntries.length-1].date)}</td>
+      <td style="font-weight:600">${s}</td>
+      <td style="color:#64748B">${loc}</td>
+      <td style="text-align:right;font-weight:700">₹${totalAdv.toLocaleString('en-IN')}</td>
+      <td style="text-align:right">₹${totalExp.toLocaleString('en-IN')}</td>
+      <td style="text-align:right;${balStyle}">₹${Math.abs(balance).toLocaleString('en-IN')} ${balance>0?'pending':'settled'}</td>
+      <td style="color:#64748B;font-size:11.5px">${notes||'—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderHistory() {
+  const el = document.getElementById('history-tbody'); if(!el) return;
+  const done = expenses.filter(e=>e.status==='approved'||e.status==='auto-approved'||e.status==='rejected').sort((a,b)=>new Date(b.approvedAt||b.rejectedAt||0)-new Date(a.approvedAt||a.rejectedAt||0));
+  if(!done.length){ el.innerHTML='<tr><td colspan="8" class="empty-state">No history yet.</td></tr>'; return; }
+  el.innerHTML = done.map(e=>{
+    const cat=CATS[e.cat]||CATS.other;
+    const sb=e.status==='approved'||e.status==='auto-approved'?'b-approved':'b-rejected';
+    const _ts = e.approvedAt||e.rejectedAt||''; const when = _ts ? fmtDate(_ts.slice(0,10)) : '—';
+    return `<tr>
+      <td style="font-size:11px;color:#64748B">${e.ref||'—'}</td>
+      <td style="color:#64748B;font-size:11.5px">${fmtDate(e.date)}</td>
+      <td style="font-weight:600">${e.staff}</td>
+      <td><span class="badge ${cat.cls}">${cat.label}</span></td>
+      <td style="text-align:right;font-weight:700">₹${e.amount.toLocaleString('en-IN')}</td>
+      <td><span class="badge ${sb}">${e.status==='auto-approved'?'auto-approved':e.status}</span></td>
+      <td style="color:#64748B;font-size:11.5px">${e.approvedBy||'—'} on ${when}</td>
+      <td style="color:#991B1B;font-size:11.5px">${e.rejectionRemark||'—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function clearAll() {
+  if(!confirm('This will permanently delete ALL expense data from this browser. Are you sure?')) return;
+  expenses = []; expenseCounter = 0;
+  save();
+  localStorage.removeItem('fpe_counter');
+  renderAll();
+  showGlobalNotice('All data cleared.','info');
+}
+
+function toggleAllChecks(master) {
+  document.querySelectorAll('.appr-chk').forEach(c => c.checked = master.checked);
+}
+
+function bulkApprove() {
+  const checked = Array.from(document.querySelectorAll('.appr-chk:checked')).map(c=>parseInt(c.dataset.id));
+  if(!checked.length){ alert('Select at least one expense to approve.'); return; }
+  if(!confirm(`Approve ${checked.length} expense(s)?`)) return;
+  checked.forEach(id=>{
+    const e=expenses.find(x=>x.id===id);
+    if(e && e.status==='pending'){ e.status='approved'; e.approvedAt=new Date().toISOString(); e.approvedBy=currentUser; pushOne(e); }
+  });
+  save(); renderAll(); showNotice('appr-notice',`${checked.length} expense(s) approved.`,'success');
+}
+
+function saveBudget() {
+  const val = parseFloat(document.getElementById('budget-input').value);
+  if(!val || val<=0) { alert('Please enter a valid budget amount.'); return; }
+  monthlyBudget = val;
+  localStorage.setItem('fpe_budget', val);
+  showGlobalNotice(`Monthly budget set to ₹${val.toLocaleString('en-IN')}.`, 'success');
+  renderOwner();
+}
+
+let managerUnlocked = false;
+
+function updateApprovalTitle() {
+  const title = document.getElementById('appr-queue-title');
+  const desc = document.getElementById('appr-queue-desc');
+  if(!title) return;
+  if(currentRole === 'owner') {
+    title.textContent = 'Supervisor expenses — pending owner approval';
+    desc.textContent = 'Supervisor expenses above ₹2,000 require your approval.';
+  } else {
+    title.textContent = 'Employee expenses — pending your approval';
+    desc.textContent = 'Review each entry, check vendor & photo, then approve or reject.';
+  }
+}
+
+
+let editPhotoData = null; // null = keep existing, array = new photos
+
+function openEditModal(id) {
+  const e = expenses.find(x=>x.id===id); if(!e) return;
+  document.getElementById('edit-id').value = id;
+  document.getElementById('edit-date').value = e.date;
+  document.getElementById('edit-date').max = todayStr();
+  const eloc = document.getElementById('edit-location'); if(eloc) eloc.value = e.location||'Vijay Nagar';
+  document.getElementById('edit-cat').value = e.cat;
+  document.getElementById('edit-amount').value = e.amount;
+  document.getElementById('edit-desc').value = e.desc;
+  document.getElementById('edit-from').value = e.from||'';
+  document.getElementById('edit-to').value = e.to||'';
+  document.getElementById('edit-rider').value = e.rider||'';
+  document.getElementById('edit-vehicle').value = e.vehicle||'';
+  document.getElementById('edit-vname').value = e.vname||'';
+  document.getElementById('edit-vphone').value = e.vphone||'';
+  document.getElementById('edit-vaddr').value = e.vaddr||'';
+  document.getElementById('edit-vinv').value = e.vinv||'';
+  editPhotoData = null;
+  const tw = document.getElementById('edit-thumbs');
+  tw.innerHTML = '';
+  if(e.photos&&e.photos.length){
+    e.photos.forEach(p=>{
+      const img=document.createElement('img'); img.src=p; img.className='thumb';
+      img.onclick=()=>showPhoto(p); tw.appendChild(img);
+    });
+  }
+  document.getElementById('edit-photo').value='';
+  toggleEditFields();
+  document.getElementById('edit-modal').classList.add('open');
+}
+
+function closeEditModal() {
+  document.getElementById('edit-modal').classList.remove('open');
+  editPhotoData = null;
+}
+
+function toggleEditFields() {
+  const cat = document.getElementById('edit-cat').value;
+  document.getElementById('edit-conv-row').style.display = (cat==='rider'||cat==='toll') ? 'grid' : 'none';
+  document.getElementById('edit-rider-row').style.display = cat==='rider' ? 'grid' : 'none';
+  const req = !VENDOR_OPTIONAL_CATS.includes(cat);
+  const star = req ? ' *' : '';
+  document.getElementById('edit-lbl-vname').textContent = 'Vendor Name' + star;
+  document.getElementById('edit-lbl-vphone').textContent = 'Vendor Contact' + star;
+  document.getElementById('edit-lbl-vaddr').textContent = 'Vendor Address' + star;
+}
+
+function handleEditPhotos(ev) {
+  const files = Array.from(ev.target.files).slice(0,3);
+  editPhotoData = [];
+  const tw = document.getElementById('edit-thumbs');
+  tw.innerHTML = '';
+  files.forEach(f=>{
+    const r=new FileReader();
+    r.onload=ev2=>{
+      editPhotoData.push(ev2.target.result);
+      const img=document.createElement('img'); img.src=ev2.target.result; img.className='thumb';
+      img.onclick=()=>showPhoto(ev2.target.result); tw.appendChild(img);
+    };
+    r.readAsDataURL(f);
+  });
+}
+
+function saveEdit() {
+  const id = parseInt(document.getElementById('edit-id').value);
+  const e = expenses.find(x=>x.id===id); if(!e) return;
+  const cat    = document.getElementById('edit-cat').value;
+  const amount = parseFloat(document.getElementById('edit-amount').value);
+  const desc   = document.getElementById('edit-desc').value.trim();
+  const vname  = document.getElementById('edit-vname').value.trim();
+  const vphone = document.getElementById('edit-vphone').value.trim();
+  const vaddr  = document.getElementById('edit-vaddr').value.trim();
+  if (!amount||amount<=0) { alert('Please enter a valid amount.'); return; }
+  if (!desc) { alert('Please enter a description.'); return; }
+  if (!VENDOR_OPTIONAL_CATS.includes(cat)) {
+    if (!vname)  { alert('Vendor Name is required for this category.'); return; }
+    if (!vphone) { alert('Vendor Contact is required for this category.'); return; }
+    if (!/^[0-9]{10}$/.test(vphone.replace(/\s/g,''))) { alert('Vendor Contact must be a 10-digit phone number.'); return; }
+    if (!/^[0-9]{10}$/.test(vphone.replace(/\s/g,''))) { alert('Vendor Contact must be a 10-digit phone number.'); return; }
+    if (!vaddr)  { alert('Vendor Address is required for this category.'); return; }
+  }
+  if (editPhotoData !== null && editPhotoData.length === 0) {
+    alert('Photo Proof is compulsory. Please upload at least one photo.'); return;
+  }
+  e.date     = document.getElementById('edit-date').value;
+  const elocVal = document.getElementById('edit-location'); e.location = elocVal ? elocVal.value : (e.location||'Vijay Nagar');
+  e.cat     = cat;
+  e.amount  = amount;
+  e.desc    = desc;
+  e.from    = document.getElementById('edit-from').value.trim();
+  e.to      = document.getElementById('edit-to').value.trim();
+  e.rider   = document.getElementById('edit-rider').value.trim();
+  e.vehicle = document.getElementById('edit-vehicle').value.trim();
+  e.vname   = vname;
+  e.vphone  = vphone;
+  e.vaddr   = vaddr;
+  e.vinv    = document.getElementById('edit-vinv').value.trim();
+  if (editPhotoData !== null) e.photos = editPhotoData;
+  e.role    = currentRole;
+  e.status  = (currentRole === 'supervisor' && e.amount <= 2000) ? 'auto-approved' : 'pending';
+  e.editedAt = new Date().toISOString();
+  save();
+  pushOne(expenses.find(x=>x.id===id));
+  closeEditModal();
+  renderAll();
+  showGlobalNotice('Expense updated and resubmitted for approval.', 'success');
+}
+
+document.getElementById('edit-modal').addEventListener('click', function(ev){ if(ev.target===this) closeEditModal(); });
+
+function printReport() {
+  const period = document.getElementById('owner-period')?.value||'month';
+  const data = getFilteredByPeriod();
+  const total = data.reduce((s,e)=>s+e.amount,0);
+  const approved = data.filter(e=>e.status==='approved'||e.status==='auto-approved').reduce((s,e)=>s+e.amount,0);
+  const win = window.open('','_blank');
+  if(!win){ alert('Popup blocked. Please allow popups for this page in your browser settings, then try again.'); return; }
+  win.document.write(`<!DOCTYPE html><html><head><title>Expense Report — Aaray Packaging</title>
+  <style>body{font-family:Arial,sans-serif;padding:24px;color:#1B2A4A}h1{font-size:20px;margin-bottom:4px}h2{font-size:14px;font-weight:normal;color:#64748B;margin-bottom:20px}table{width:100%;border-collapse:collapse;font-size:12px}th{background:#1B2A4A;color:#fff;padding:8px;text-align:left}td{padding:7px 8px;border-bottom:1px solid #E2EAF0}tr:last-child td{border-bottom:none}.summary{display:flex;gap:24px;margin-bottom:20px;flex-wrap:wrap}.sm{background:#F4F7F9;padding:12px 16px;border-radius:8px;min-width:120px}.sm-v{font-size:20px;font-weight:700;color:#028090}.sm-l{font-size:11px;color:#64748B;margin-top:2px}@media print{button{display:none}}</style></head><body>
+  <h1>Aaray Packaging Private Limited</h1>
+  <h2>Petty Expense Report — ${period.charAt(0).toUpperCase()+period.slice(1)}</h2>
+  <div class="summary">
+    <div class="sm"><div class="sm-v">₹${total.toLocaleString('en-IN')}</div><div class="sm-l">Total submitted</div></div>
+    <div class="sm"><div class="sm-v" style="color:#10B981">₹${approved.toLocaleString('en-IN')}</div><div class="sm-l">Approved</div></div>
+    <div class="sm"><div class="sm-v">${data.length}</div><div class="sm-l">Entries</div></div>
+  </div>
+  <table><tr><th>Ref</th><th>Date</th><th>Staff</th><th>Location</th><th>Category</th><th>Description</th><th>Vendor</th><th style="text-align:right">Amount</th><th>Status</th></tr>
+  ${data.map(e=>`<tr><td>${e.ref||'—'}</td><td>${e.date}</td><td>${e.staff}</td><td>${e.location||'—'}</td><td>${CATS[e.cat]?.label||e.cat}</td><td>${e.desc}</td><td>${e.vname||'—'}</td><td style="text-align:right">₹${e.amount.toLocaleString('en-IN')}</td><td>${e.status}</td></tr>`).join('')}
+  </table>
+  <p style="margin-top:20px;font-size:11px;color:#64748B">Generated on ${new Date().toLocaleString('en-IN')} by ${currentUser}</p>
+  <button onclick="window.print()" style="margin-top:16px;padding:8px 20px;background:#028090;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">Print / Save as PDF</button>
+  </body></html>`);
+  win.document.close();
+}
+
+function exportExcel() {
+  const data = getFilteredByPeriod();
+  if(!data.length){ alert('No data to export.'); return; }
+  const h = ['Ref','Date','Staff','Location','Category','Description','Vendor Name','Vendor Contact','Vendor Address','Invoice No','Amount','Status','Approved By','Rejection Reason'];
+  const rows = data.map(e=>[
+    e.ref||'', e.date, e.staff, e.location||'', CATS[e.cat]?.label||e.cat, e.desc,
+    e.vname||'', e.vphone||'', e.vaddr||'', e.vinv||'',
+    e.amount, e.status, e.approvedBy||'', e.rejectionRemark||''
+  ]);
+  // Build Excel XML (XLSX-compatible via data URI)
+  let xml = '<?xml version="1.0"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="Expenses"><Table>';
+  [h,...rows].forEach(row=>{
+    xml += '<Row>'+row.map(c=>`<Cell><Data ss:Type="${typeof c==='number'?'Number':'String'}">${String(c).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</Data></Cell>`).join('')+'</Row>';
+  });
+  xml += '</Table></Worksheet></Workbook>';
+  const blob = new Blob([xml],{type:'application/vnd.ms-excel'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='petty_expenses.xls'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+init();
+</script>
+</div></div>
+</body>
+</html>
