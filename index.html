@@ -1275,28 +1275,23 @@ function updateSyncStatus() {
 // Push a single expense to sheet immediately
 async function pushOne(exp) {
   if(!sheetUrl) return;
-  const payload = {...exp, photos:[]};
-  const bodyStr = JSON.stringify({expense: payload});
-  const encoded = encodeURIComponent(bodyStr);
-  const url = sheetUrl + '?data=' + encoded;
-
-  if(url.length <= 8000) {
-    // GET request — no CORS issue, works from any origin
+  // Always strip photos and truncate desc to keep URL under 4000 chars
+  const payload = {
+    ...exp,
+    photos: [],
+    desc: (exp.desc||'').slice(0, 200),
+    vaddr: (exp.vaddr||'').slice(0, 100),
+  };
+  try {
+    const encoded = encodeURIComponent(JSON.stringify({expense: payload}));
+    const url = sheetUrl + '?data=' + encoded;
+    const res = await fetch(url);
+    await res.text();
+  } catch(e) {
     try {
-      await fetch(url);
-    } catch(e) {
-      // no-cors fallback for strict browsers
-      try { await fetch(url, {mode:'no-cors'}); } catch(e2) {}
-    }
-  } else {
-    // Payload too large — use no-cors POST with text/plain (simple request, no preflight)
-    try {
-      await fetch(sheetUrl, {
-        method: 'POST',
-        mode: 'no-cors',
-        body: bodyStr  // text/plain is a simple header — no preflight
-      });
-    } catch(e) {}
+      const encoded = encodeURIComponent(JSON.stringify({expense: payload}));
+      await fetch(sheetUrl + '?data=' + encoded, {mode:'no-cors'});
+    } catch(e2) {}
   }
 }
 
@@ -1396,21 +1391,21 @@ async function syncToSheet() {
   let successCount = 0;
 
   for(const exp of payload) {
-    const bodyStr = JSON.stringify({expense: exp});
     try {
-      const encoded = encodeURIComponent(bodyStr);
+      const slim = {...exp, desc:(exp.desc||'').slice(0,200), vaddr:(exp.vaddr||'').slice(0,100)};
+      const encoded = encodeURIComponent(JSON.stringify({expense: slim}));
       const url = sheetUrl + '?data=' + encoded;
-      if(url.length <= 8000) {
-        await fetch(url);
-      } else {
-        await fetch(sheetUrl, {method:'POST', mode:'no-cors', body: bodyStr});
-      }
+      const res = await fetch(url);
+      await res.text();
       successCount++;
     } catch(e) {
-      try { await fetch(sheetUrl, {method:'POST', mode:'no-cors', body: bodyStr}); successCount++; } catch(e2) {}
+      try {
+        const slim = {...exp, desc:(exp.desc||'').slice(0,200), vaddr:(exp.vaddr||'').slice(0,100)};
+        await fetch(sheetUrl + '?data=' + encodeURIComponent(JSON.stringify({expense:slim})), {mode:'no-cors'});
+        successCount++;
+      } catch(e2) {}
     }
-    // Small delay to avoid rate limiting
-    await new Promise(r => setTimeout(r, 100));
+    await new Promise(r => setTimeout(r, 150));
   }
 
   const now = new Date().toLocaleTimeString('en-IN');
