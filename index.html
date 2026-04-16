@@ -616,7 +616,7 @@ tr:hover td{background:#FAFCFD}
 let expenses = [];
 let filterCat = 'all';
 let photoData = [];
-let sheetUrl = 'https://script.google.com/macros/s/AKfycbz7_JceElnyO5nLgWv2-6XgqPhFqDWVH46U7q3CCf487nABrGO3mUahw2YvdVQV3lan/exec'; // hardcoded default
+let sheetUrl = 'https://script.google.com/macros/s/AKfycbyGCR5lvxHG_q3LA6eRvGn4DylUs4pPNNaxbOZSTWfxJogvyC2m9MkK8USNioy-1wcV/exec'; // hardcoded default
 
 const CATS = {
   fooding:      { label: 'Fooding',              cls: 'b-fooding' },
@@ -657,7 +657,7 @@ function init() {
   if(dateEl){ dateEl.value = todayStr(); dateEl.max = todayStr(); }
   try {
     const s = localStorage.getItem('fpe_v4'); if (s) { try { expenses = JSON.parse(s); } catch(pe){ expenses=[]; } }
-    sheetUrl = localStorage.getItem('fpe_sheet_url') || 'https://script.google.com/macros/s/AKfycbz7_JceElnyO5nLgWv2-6XgqPhFqDWVH46U7q3CCf487nABrGO3mUahw2YvdVQV3lan/exec';
+    sheetUrl = localStorage.getItem('fpe_sheet_url') || 'https://script.google.com/macros/s/AKfycbyGCR5lvxHG_q3LA6eRvGn4DylUs4pPNNaxbOZSTWfxJogvyC2m9MkK8USNioy-1wcV/exec';
     document.getElementById('sheet-url').value = sheetUrl;
     currentUser = localStorage.getItem('fpe_username') || '';
     currentRole = localStorage.getItem('fpe_role') || 'employee';
@@ -887,6 +887,7 @@ function addExpense() {
   const newExp = expenses[0];
   save();
   pushOne(newExp);
+  syncToSheet(true); // auto sync silently
   clearForm();
   renderAll();
   if(currentRole === 'supervisor' && newExp.amount <= 2000) {
@@ -924,6 +925,7 @@ function approve(id) {
   const e = expenses.find(x=>x.id===id||String(x.id)===String(id));
   if(e){ e.status='approved'; e.approvedAt=new Date().toISOString(); e.approvedBy=currentUser; }
   save(); pushOne(e); renderAll(); showNotice('appr-notice','Approved successfully.','success');
+  syncToSheet(true);
 }
 
 function reject(id) {
@@ -938,6 +940,7 @@ function reject(id) {
     e.approvedBy = currentUser;
   }
   save(); pushOne(e); renderAll(); showNotice('appr-notice','Expense rejected — remark saved.','info');
+  syncToSheet(true);
 }
 
 function showNotice(elId, msg, type='success') {
@@ -1297,36 +1300,37 @@ async function compressPhoto(dataUrl, maxWidth=400, quality=0.5) {
 async function pushOne(exp) {
   if(!sheetUrl) return;
 
-  // Compress photo if present
-  let photos = [];
-  if(exp.photos && exp.photos.length > 0) {
-    const compressed = await compressPhoto(exp.photos[0]);
-    if(compressed) photos = [compressed];
-  }
-
+  // Step 1: Send expense data WITHOUT photo via GET (reliable)
   const slim = {
     ...exp,
-    photos: photos,
+    photos: [],
     desc: (exp.desc||'').slice(0,200),
     vaddr: (exp.vaddr||'').slice(0,100),
   };
-
-  // Try GET request (works reliably from GitHub Pages)
   try {
     const encoded = encodeURIComponent(JSON.stringify({expense: slim}));
-    const url = sheetUrl + '?data=' + encoded;
-    const res = await fetch(url);
-    const data = await res.json();
-    if(data.photoLinks && data.photoLinks.length > 0) {
-      const localExp = expenses.find(x => String(x.id) === String(exp.id));
-      if(localExp) { localExp.photoLinks = data.photoLinks; save(); }
-    }
-  } catch(e) {
-    // Fallback without photo
+    const res = await fetch(sheetUrl + '?data=' + encoded);
+    await res.text();
+  } catch(e) {}
+
+  // Step 2: Send photo separately via no-cors POST if photo exists
+  if(exp.photos && exp.photos.length > 0 && sheetUrl) {
     try {
-      const fallback = {...slim, photos:[]};
-      await fetch(sheetUrl + '?data=' + encodeURIComponent(JSON.stringify({expense: fallback})));
-    } catch(e2) {}
+      const compressed = await compressPhoto(exp.photos[0]);
+      if(compressed) {
+        const photoPayload = JSON.stringify({
+          action: 'uploadPhoto',
+          expenseId: String(exp.id),
+          staff: exp.staff||'',
+          photos: [compressed]
+        });
+        await fetch(sheetUrl, {
+          method: 'POST',
+          mode: 'no-cors',
+          body: photoPayload
+        });
+      }
+    } catch(e) {}
   }
 }
 
@@ -1415,32 +1419,40 @@ async function pullAllFromSheet() {
   } catch(err) { console.log('pullAll failed', err); showGlobalNotice('Could not refresh from sheet — showing local data.','info'); }
 }
 
-async function syncToSheet() {
+async function syncToSheet(silent=false) {
   if(!sheetUrl) {
-    showGlobalNotice('Please set your Google Sheet URL in Settings first.','error');
+    if(!silent) showGlobalNotice('Please set your Google Sheet URL in Settings first.','error');
     return;
   }
   const btn = document.getElementById('sync-btn');
-  btn.disabled = true; btn.textContent = 'Syncing...';
+  if(!silent){ btn.disabled = true; btn.textContent = 'Syncing...'; }
   const payload = expenses.map(e=>({...e, photos:[]}));
   let successCount = 0;
 
   for(const exp of payload) {
     try {
-      // Compress photo if present
-      let photos = [];
+      // Step 1: Send expense without photo via GET
+      const slim = {...exp, photos:[], desc:(exp.desc||'').slice(0,200), vaddr:(exp.vaddr||'').slice(0,100)};
+      const encoded = encodeURIComponent(JSON.stringify({expense: slim}));
+      await fetch(sheetUrl + '?data=' + encoded);
+
+      // Step 2: Send photo separately via no-cors POST
       if(exp.photos && exp.photos.length > 0) {
         const compressed = await compressPhoto(exp.photos[0]);
-        if(compressed) photos = [compressed];
-      }
-      const slim = {...exp, photos, desc:(exp.desc||'').slice(0,200), vaddr:(exp.vaddr||'').slice(0,100)};
-      const encoded = encodeURIComponent(JSON.stringify({expense: slim}));
-      const url = sheetUrl + '?data=' + encoded;
-      const res = await fetch(url);
-      const data = await res.json();
-      if(data.photoLinks && data.photoLinks.length > 0) {
-        const localExp = expenses.find(x => String(x.id) === String(exp.id));
-        if(localExp) { localExp.photoLinks = data.photoLinks; }
+        if(compressed) {
+          await fetch(sheetUrl, {
+            method: 'POST',
+            mode: 'no-cors',
+            body: JSON.stringify({
+              action: 'uploadPhoto',
+              expenseId: String(exp.id),
+              staff: exp.staff||'',
+              photos: [compressed]
+            })
+          });
+          // Small extra delay for photo upload
+          await new Promise(r => setTimeout(r, 300));
+        }
       }
       successCount++;
     } catch(e) {
@@ -1456,9 +1468,11 @@ async function syncToSheet() {
 
   const now = new Date().toLocaleTimeString('en-IN');
   localStorage.setItem('fpe_last_sync', now);
-  showGlobalNotice(`Synced ${successCount}/${payload.length} entries. Last sync: ${now}`, 'success');
-  document.getElementById('sync-status').textContent = `Last sync: ${now}`;
-  document.getElementById('sync-status').style.color = '#02C39A';
+  if(!silent) {
+    showGlobalNotice(`Synced ${successCount}/${payload.length} entries. Last sync: ${now}`, 'success');
+    document.getElementById('sync-status').textContent = `Last sync: ${now}`;
+    document.getElementById('sync-status').style.color = '#02C39A';
+  }
   btn.disabled = false; btn.textContent = 'Sync to Sheet';
 }
 
