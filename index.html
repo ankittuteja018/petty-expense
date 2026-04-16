@@ -234,7 +234,7 @@ tr:hover td{background:#FAFCFD}
     </div>
 
     <div class="card">
-      <div class="card-title">Photo Proof * <span style="font-size:12px;color:#94A3B8;font-weight:400">(up to 3, compulsory)</span></div>
+      <div class="card-title">Photo Proof * <span style="font-size:12px;color:#94A3B8;font-weight:400">(1 photo, compulsory)</span></div>
       <div class="photo-box" onclick="document.getElementById('i-photo').click()">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="1.5" style="margin:0 auto;display:block">
           <rect x="2" y="7" width="20" height="14" rx="2"/><circle cx="12" cy="14" r="3"/>
@@ -243,7 +243,7 @@ tr:hover td{background:#FAFCFD}
         <p>Tap to upload bill / receipt photo</p>
         <p style="font-size:11px;color:#94A3B8;margin-top:2px">JPG or PNG</p>
       </div>
-      <input type="file" id="i-photo" accept="image/*" multiple style="display:none" onchange="handlePhotos(event)">
+      <input type="file" id="i-photo" accept="image/*" style="display:none" onchange="handlePhotos(event)">
       <div class="thumb-wrap" id="thumbs"></div>
     </div>
     <div class="btn-row">
@@ -589,7 +589,7 @@ tr:hover td{background:#FAFCFD}
           <div class="photo-box" onclick="document.getElementById('edit-photo').click()" style="padding:12px">
             <p style="margin:0">Tap to replace photos</p>
           </div>
-          <input type="file" id="edit-photo" accept="image/*" multiple style="display:none" onchange="handleEditPhotos(event)">
+          <input type="file" id="edit-photo" accept="image/*" style="display:none" onchange="handleEditPhotos(event)">
           <div class="thumb-wrap" id="edit-thumbs"></div>
         </div>
       </div>
@@ -815,7 +815,7 @@ function toggleFields() {
 }
 
 function handlePhotos(e) {
-  const files = Array.from(e.target.files).slice(0,3);
+  const files = Array.from(e.target.files).slice(0,1);
   photoData = [];
   const wrap = document.getElementById('thumbs');
   wrap.innerHTML = '';
@@ -1276,37 +1276,56 @@ function updateSyncStatus() {
   }
 }
 
+// Compress image to small JPEG for GET request
+async function compressPhoto(dataUrl, maxWidth=400, quality=0.5) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ratio = Math.min(maxWidth / img.width, maxWidth / img.height, 1);
+      canvas.width = Math.round(img.width * ratio);
+      canvas.height = Math.round(img.height * ratio);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => resolve(null);
+    img.src = dataUrl;
+  });
+}
+
 // Push a single expense to sheet immediately
 async function pushOne(exp) {
   if(!sheetUrl) return;
-  const photos = exp.photos || [];
+
+  // Compress photo if present
+  let photos = [];
+  if(exp.photos && exp.photos.length > 0) {
+    const compressed = await compressPhoto(exp.photos[0]);
+    if(compressed) photos = [compressed];
+  }
+
   const slim = {
     ...exp,
-    photos: photos, // send photos for Drive upload
+    photos: photos,
     desc: (exp.desc||'').slice(0,200),
     vaddr: (exp.vaddr||'').slice(0,100),
   };
+
+  // Try GET request (works reliably from GitHub Pages)
   try {
-    // Use POST to handle photos
-    const res = await fetch(sheetUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({expense: slim})
-    });
+    const encoded = encodeURIComponent(JSON.stringify({expense: slim}));
+    const url = sheetUrl + '?data=' + encoded;
+    const res = await fetch(url);
     const data = await res.json();
-    // If server returned photo links, store them locally
     if(data.photoLinks && data.photoLinks.length > 0) {
       const localExp = expenses.find(x => String(x.id) === String(exp.id));
-      if(localExp) {
-        localExp.photoLinks = data.photoLinks;
-        save();
-      }
+      if(localExp) { localExp.photoLinks = data.photoLinks; save(); }
     }
   } catch(e) {
-    // Fallback: GET without photos
+    // Fallback without photo
     try {
       const fallback = {...slim, photos:[]};
-      await fetch(sheetUrl + '?data=' + encodeURIComponent(JSON.stringify({expense: fallback})), {mode:'no-cors'});
+      await fetch(sheetUrl + '?data=' + encodeURIComponent(JSON.stringify({expense: fallback})));
     } catch(e2) {}
   }
 }
@@ -1408,21 +1427,32 @@ async function syncToSheet() {
 
   for(const exp of payload) {
     try {
-      const slim = {...exp, desc:(exp.desc||'').slice(0,200), vaddr:(exp.vaddr||'').slice(0,100)};
+      // Compress photo if present
+      let photos = [];
+      if(exp.photos && exp.photos.length > 0) {
+        const compressed = await compressPhoto(exp.photos[0]);
+        if(compressed) photos = [compressed];
+      }
+      const slim = {...exp, photos, desc:(exp.desc||'').slice(0,200), vaddr:(exp.vaddr||'').slice(0,100)};
       const encoded = encodeURIComponent(JSON.stringify({expense: slim}));
       const url = sheetUrl + '?data=' + encoded;
       const res = await fetch(url);
-      await res.text();
+      const data = await res.json();
+      if(data.photoLinks && data.photoLinks.length > 0) {
+        const localExp = expenses.find(x => String(x.id) === String(exp.id));
+        if(localExp) { localExp.photoLinks = data.photoLinks; }
+      }
       successCount++;
     } catch(e) {
       try {
-        const slim = {...exp, desc:(exp.desc||'').slice(0,200), vaddr:(exp.vaddr||'').slice(0,100)};
-        await fetch(sheetUrl + '?data=' + encodeURIComponent(JSON.stringify({expense:slim})), {mode:'no-cors'});
+        const slim = {...exp, photos:[], desc:(exp.desc||'').slice(0,200), vaddr:(exp.vaddr||'').slice(0,100)};
+        await fetch(sheetUrl + '?data=' + encodeURIComponent(JSON.stringify({expense:slim})));
         successCount++;
       } catch(e2) {}
     }
     await new Promise(r => setTimeout(r, 150));
   }
+  save();
 
   const now = new Date().toLocaleTimeString('en-IN');
   localStorage.setItem('fpe_last_sync', now);
@@ -1708,7 +1738,7 @@ function toggleEditFields() {
 }
 
 function handleEditPhotos(ev) {
-  const files = Array.from(ev.target.files).slice(0,3);
+  const files = Array.from(ev.target.files).slice(0,1);
   editPhotoData = [];
   const tw = document.getElementById('edit-thumbs');
   tw.innerHTML = '';
