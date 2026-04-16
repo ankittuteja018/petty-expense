@@ -758,7 +758,7 @@ function setupTabsForRole(role) {
   // Employee: Add, Log only
   // Supervisor: Add, Log, Approval queue
   // Owner: Log, Approval queue, Owner dashboard, Settings (no Add tab)
-  document.getElementById('tab-btn-add').style.display = role === 'owner' ? 'none' : 'flex';
+  document.getElementById('tab-btn-add').style.display = 'flex';
   document.getElementById('tab-btn-approval').style.display = (role === 'supervisor' || role === 'owner') ? 'flex' : 'none';
   document.getElementById('tab-btn-owner').style.display = role === 'owner' ? 'flex' : 'none';
   document.getElementById('tab-btn-settings').style.display = role === 'owner' ? 'flex' : 'none';
@@ -1005,7 +1005,7 @@ function renderLog() {
   tb.innerHTML = filtered.map(e=>{
     const cat=CATS[e.cat]||CATS.other;
     const sb=e.status==='approved'||e.status==='auto-approved'?'b-approved':e.status==='rejected'?'b-rejected':'b-pending';
-    const ph=e.photos&&e.photos.length?`<span style="color:#028090;cursor:pointer;font-size:11px;font-weight:700" onclick="showDetail(${e.id})">View (${e.photos.length})</span>`:'<span style="color:#CBD5E1">—</span>';
+    const ph=e.photos&&e.photos.length?`<span style="color:#028090;cursor:pointer;font-size:11px;font-weight:700" onclick="showDetail(${e.id})">View (${e.photos.length})</span>`:e.photoLinks&&e.photoLinks.length?`<a href="${e.photoLinks[0]}" target="_blank" style="color:#028090;font-size:11px;font-weight:700">View ↗</a>`:'<span style="color:#CBD5E1">—</span>';
     const canEdit = e.status === 'pending' || e.status === 'rejected';
     return `<tr>
       <td style="font-size:11px;color:#64748B;white-space:nowrap">${e.ref||'—'}</td>
@@ -1044,7 +1044,7 @@ function renderApproval() {
   if(pending.length===0){tb.innerHTML=`<tr><td colspan="8" class="empty-state">No pending ${label} expenses — all clear!</td></tr>`;return;}
   tb.innerHTML = pending.map(e=>{
     const cat=CATS[e.cat]||CATS.other;
-    const ph=e.photos&&e.photos.length?`<span style="color:#028090;cursor:pointer;font-size:11px;font-weight:700" onclick="showDetail(${e.id})">View (${e.photos.length})</span>`:'<span style="color:#CBD5E1">—</span>';
+    const ph=e.photos&&e.photos.length?`<span style="color:#028090;cursor:pointer;font-size:11px;font-weight:700" onclick="showDetail(${e.id})">View (${e.photos.length})</span>`:e.photoLinks&&e.photoLinks.length?`<a href="${e.photoLinks[0]}" target="_blank" style="color:#028090;font-size:11px;font-weight:700">View ↗</a>`:'<span style="color:#CBD5E1">—</span>';
     const ageDays = e.submittedAt ? Math.floor((Date.now()-new Date(e.submittedAt))/(1000*60*60*24)) : 0;
     const ageStyle = ageDays>=2 ? 'color:#991B1B;font-weight:700' : 'color:#64748B';
     const ageLabel = ageDays===0?'Today':ageDays===1?'1 day':`${ageDays}d ⚠`;
@@ -1238,6 +1238,10 @@ function showDetail(id) {
     html+=`<div style="margin-top:14px"><div class="section-label">Photo Proof (${e.photos.length})</div><div class="photo-preview">`;
     e.photos.forEach(p=>{ html+=`<img src="${p}" onclick="showPhoto('${p}')">`; });
     html+=`</div></div>`;
+  } else if(e.photoLinks&&e.photoLinks.length){
+    html+=`<div style="margin-top:14px"><div class="section-label">Photo Proof</div>`;
+    e.photoLinks.forEach((link,i)=>{ html+=`<a href="${link}" target="_blank" style="display:inline-block;margin:4px 6px 4px 0;padding:6px 14px;background:#028090;color:#fff;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none">View Photo ${i+1} ↗</a>`; });
+    html+=`</div>`;
   }
   if(e.status==='pending' && (currentRole==='supervisor' || currentRole==='owner')){
     html+=`<div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
@@ -1275,22 +1279,34 @@ function updateSyncStatus() {
 // Push a single expense to sheet immediately
 async function pushOne(exp) {
   if(!sheetUrl) return;
-  // Always strip photos and truncate desc to keep URL under 4000 chars
-  const payload = {
+  const photos = exp.photos || [];
+  const slim = {
     ...exp,
-    photos: [],
-    desc: (exp.desc||'').slice(0, 200),
-    vaddr: (exp.vaddr||'').slice(0, 100),
+    photos: photos, // send photos for Drive upload
+    desc: (exp.desc||'').slice(0,200),
+    vaddr: (exp.vaddr||'').slice(0,100),
   };
   try {
-    const encoded = encodeURIComponent(JSON.stringify({expense: payload}));
-    const url = sheetUrl + '?data=' + encoded;
-    const res = await fetch(url);
-    await res.text();
+    // Use POST to handle photos
+    const res = await fetch(sheetUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({expense: slim})
+    });
+    const data = await res.json();
+    // If server returned photo links, store them locally
+    if(data.photoLinks && data.photoLinks.length > 0) {
+      const localExp = expenses.find(x => String(x.id) === String(exp.id));
+      if(localExp) {
+        localExp.photoLinks = data.photoLinks;
+        save();
+      }
+    }
   } catch(e) {
+    // Fallback: GET without photos
     try {
-      const encoded = encodeURIComponent(JSON.stringify({expense: payload}));
-      await fetch(sheetUrl + '?data=' + encoded, {mode:'no-cors'});
+      const fallback = {...slim, photos:[]};
+      await fetch(sheetUrl + '?data=' + encodeURIComponent(JSON.stringify({expense: fallback})), {mode:'no-cors'});
     } catch(e2) {}
   }
 }
