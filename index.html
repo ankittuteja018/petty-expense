@@ -466,7 +466,7 @@ tr:hover td{background:var(--tr-hover)}
         </div>
         <div class="table-wrap" style="margin-top:12px">
           <table>
-            <thead><tr><th>Date</th><th>Staff</th><th>Location</th><th style="text-align:right">Advance given</th><th style="text-align:right">Expenses submitted</th><th style="text-align:right">Balance outstanding</th><th>Notes</th></tr></thead>
+            <thead><tr><th>Ref</th><th>Date</th><th>Staff</th><th>Location</th><th style="text-align:right">Advance given</th><th style="text-align:right">Expenses submitted</th><th style="text-align:right">Balance outstanding</th><th>Notes</th><th>Action</th></tr></thead>
             <tbody id="advance-tbody"></tbody>
           </table>
         </div>
@@ -639,9 +639,15 @@ tr:hover td{background:var(--tr-hover)}
 <!-- ADVANCE MODAL -->
 <div class="modal-overlay" id="advance-modal">
   <div class="modal">
-    <div class="modal-header"><h3>Give cash advance</h3><button class="modal-close" onclick="closeAdvanceModal()">✕</button></div>
+    <div class="modal-header"><h3 id="adv-modal-title">Give cash advance</h3><button class="modal-close" onclick="closeAdvanceModal()">✕</button></div>
+    <input type="hidden" id="adv-edit-id">
     <div class="form-row r2" style="margin-bottom:10px">
-      <div class="fg"><label>Staff name *</label><input type="text" id="adv-staff" placeholder="Staff name"></div>
+      <div class="fg">
+        <label>Staff name *</label>
+        <select id="adv-staff" style="width:100%;padding:8px 10px;border:1px solid var(--input-border);border-radius:7px;font-size:13px;color:var(--text);background:var(--input-bg)">
+          <option value="">Select staff...</option>
+        </select>
+      </div>
       <div class="fg"><label>Location *</label>
         <select id="adv-location"><option value="Vijay Nagar">Vijay Nagar</option><option value="Lal Kuan">Lal Kuan</option></select>
       </div>
@@ -1038,9 +1044,8 @@ function getAdvancesFromSheet() {
 
 function renderAdvances() {
   const el = document.getElementById('advance-tbody'); if(!el) return;
-  // All advance entries from sheet (both given by owner and received by staff)
   const advanceRows = expenses.filter(e=>e.cat==='advance'||e.status==='advance');
-  if(!advanceRows.length){ el.innerHTML='<tr><td colspan="7" class="empty-state">No advances recorded.</td></tr>'; return; }
+  if(!advanceRows.length){ el.innerHTML='<tr><td colspan="9" class="empty-state">No advances recorded.</td></tr>'; return; }
 
   // Group by staff
   const staffMap = {};
@@ -1065,7 +1070,12 @@ function renderAdvances() {
     const balColor = balance>0?'#F59E0B':balance<0?'#EF4444':'#10B981';
     const lastAdv = s.advances[s.advances.length-1];
     const enteredBy = lastAdv.role==='owner' ? '(by owner)' : '(by staff)';
+    // Show edit button only if single advance entry (for simplicity)
+    const editBtn = s.advances.length===1
+      ? `<button class="btn-sm btn-approve" onclick="openEditAdvanceModal('${lastAdv.id}')">Edit</button>`
+      : `<button class="btn-sm" style="background:var(--bg);border:1px solid var(--border);color:var(--text-muted)" onclick="openEditAdvanceModal('${lastAdv.id}')">Edit last</button>`;
     return `<tr>
+      <td style="font-size:11px;color:var(--text-muted)">${lastAdv.ref||'—'}</td>
       <td style="color:var(--text-muted);font-size:11.5px">${fmtDate(lastAdv.date)}</td>
       <td style="font-weight:600">${s.name} <span style="font-size:10px;color:var(--text-faint)">${enteredBy}</span></td>
       <td style="color:var(--text-muted)">${lastAdv.location||'—'}</td>
@@ -1073,6 +1083,7 @@ function renderAdvances() {
       <td style="text-align:right">₹${totalExp.toLocaleString('en-IN')}</td>
       <td style="text-align:right;font-weight:700;color:${balColor}">₹${Math.abs(balance).toLocaleString('en-IN')} ${balance>0?'pending':balance<0?'overspent':'settled'}</td>
       <td style="color:var(--text-muted);font-size:11.5px">${s.advances.map(a=>a.desc||'').filter(Boolean).join(' | ')||'—'}</td>
+      <td>${editBtn}</td>
     </tr>`;
   }).join('');
 }
@@ -2110,12 +2121,47 @@ async function saveAdvanceReceived() {
   setTimeout(()=>loadFromSheet(), 1500);
 }
 
-function openAdvanceModal() {
-  const advDateEl = document.getElementById('adv-date');
-  if(advDateEl){ advDateEl.value = todayStr(); advDateEl.max = todayStr(); }
+function openAdvanceModal(editId=null) {
+  // Populate staff dropdown from users
+  const users = getUsers().filter(u=>u.role!=='owner');
+  const sel = document.getElementById('adv-staff');
+  sel.innerHTML = '<option value="">Select staff...</option>' +
+    users.map(u=>`<option value="${u.fullname}">${u.fullname} (${u.role})</option>`).join('');
+
+  const titleEl = document.getElementById('adv-modal-title');
+  const editIdEl = document.getElementById('adv-edit-id');
+
+  if(editId) {
+    // Edit mode — prefill values
+    const adv = expenses.find(e=>String(e.id)===String(editId));
+    if(!adv) return;
+    titleEl.textContent = 'Edit advance';
+    editIdEl.value = editId;
+    sel.value = adv.staff;
+    document.getElementById('adv-location').value = adv.location||'Vijay Nagar';
+    document.getElementById('adv-amount').value = adv.amount;
+    document.getElementById('adv-date').value = adv.date;
+    document.getElementById('adv-notes').value = adv.desc ? adv.desc.replace('Cash advance: ','').replace('Cash advance','') : '';
+  } else {
+    // New advance
+    titleEl.textContent = 'Give cash advance';
+    editIdEl.value = '';
+    sel.value = '';
+    document.getElementById('adv-amount').value = '';
+    document.getElementById('adv-notes').value = '';
+    const advDateEl = document.getElementById('adv-date');
+    if(advDateEl){ advDateEl.value = todayStr(); advDateEl.max = todayStr(); }
+  }
   document.getElementById('advance-modal').classList.add('open');
 }
-function closeAdvanceModal() { document.getElementById('advance-modal').classList.remove('open'); }
+
+function openEditAdvanceModal(id) {
+  openAdvanceModal(id);
+}
+
+function closeAdvanceModal() {
+  document.getElementById('advance-modal').classList.remove('open');
+}
 // advance-modal close on backdrop click — registered after DOM ready
 (function(){
   const am = document.getElementById('advance-modal');
@@ -2123,28 +2169,48 @@ function closeAdvanceModal() { document.getElementById('advance-modal').classLis
 })();
 
 async function saveAdvance() {
-  const staff = document.getElementById('adv-staff').value.trim();
+  const staff    = document.getElementById('adv-staff').value.trim();
   const location = document.getElementById('adv-location').value;
-  const amount = parseFloat(document.getElementById('adv-amount').value);
-  const date = document.getElementById('adv-date').value;
-  const notes = document.getElementById('adv-notes').value.trim();
-  if(!staff){ alert('Enter staff name.'); return; }
+  const amount   = parseFloat(document.getElementById('adv-amount').value);
+  const date     = document.getElementById('adv-date').value;
+  const notes    = document.getElementById('adv-notes').value.trim();
+  const editId   = document.getElementById('adv-edit-id').value;
+
+  if(!staff)            { alert('Select a staff member.'); return; }
   if(!amount||amount<=0){ alert('Enter valid amount.'); return; }
-  const newAdv = { id:Date.now(), staff, location, amount, date, notes };
-  advances.push(newAdv);
-  // Get advance ref from sheet counter
-  const advYear = new Date().getFullYear();
-  let advRef = 'ADV-' + advYear + '-0001';
-  try {
-    const cres = await fetch(sheetUrl + '?action=nextCounter&key=' + encodeURIComponent('ADV-'+advYear));
-    const cdata = await cres.json();
-    if(cdata.success) advRef = 'ADV-' + advYear + '-' + String(cdata.value).padStart(4,'0');
-  } catch(e) {}
-  // Sync advance to sheet
-  if(sheetUrl) await pushOne({id:newAdv.id, ref:advRef, staff, location, date, cat:'advance', amount, desc:'Cash advance'+(notes?': '+notes:''), status:'advance', approvedBy:currentUser, role:'owner'});
-  closeAdvanceModal();
-  renderAdvances();
-  showGlobalNotice(`Advance of ₹${amount.toLocaleString('en-IN')} recorded for ${staff}.`,'success');
+  if(!date)             { alert('Select a date.'); return; }
+
+  const desc = 'Cash advance' + (notes ? ': ' + notes : '');
+
+  if(editId) {
+    // Edit existing advance — update in sheet
+    const adv = expenses.find(e=>String(e.id)===String(editId));
+    if(!adv) return;
+    adv.staff    = staff;
+    adv.location = location;
+    adv.amount   = amount;
+    adv.date     = date;
+    adv.desc     = desc;
+    await pushOne(adv);
+    closeAdvanceModal();
+    showGlobalNotice(`Advance updated for ${staff}.`, 'success');
+  } else {
+    // New advance
+    const advYear = new Date().getFullYear();
+    let advRef = 'ADV-' + advYear + '-0001';
+    try {
+      const cres = await fetch(sheetUrl + '?action=nextCounter&key=' + encodeURIComponent('ADV-'+advYear));
+      const cdata = await cres.json();
+      if(cdata.success) advRef = 'ADV-' + advYear + '-' + String(cdata.value).padStart(4,'0');
+    } catch(e) {}
+    const newAdv = { id:Date.now(), ref:advRef, staff, location, date, cat:'advance', amount, desc, status:'advance', approvedBy:currentUser, role:'owner', submittedAt:new Date().toISOString() };
+    expenses.unshift(newAdv);
+    await pushOne(newAdv);
+    closeAdvanceModal();
+    showGlobalNotice(`Advance of ₹${amount.toLocaleString('en-IN')} recorded for ${staff}.`, 'success');
+  }
+
+  setTimeout(()=>loadFromSheet(), 1500);
 }
 
 function renderHistory() {
