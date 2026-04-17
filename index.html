@@ -140,14 +140,12 @@ tr:hover td{background:#FAFCFD}
     <div style="width:56px;height:56px;background:#E0F7FA;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem">
       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#028090" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
     </div>
-    <h2 style="font-size:18px;font-weight:700;color:#1B2A4A;margin-bottom:6px">Who are you?</h2>
-    <p style="font-size:13px;color:#64748B;margin-bottom:1.5rem">Enter your name and select your role</p>
-    <input type="text" id="login-name" placeholder="Your full name" style="width:100%;padding:10px 14px;border:1px solid #D1D9E0;border-radius:8px;font-size:14px;color:#1B2A4A;outline:none;margin-bottom:10px" onkeydown="if(event.key==='Enter')loginUser()" oninput="autoDetectRole()">
-    <div id="login-role-row"><select id="login-role" style="width:100%;padding:10px 14px;border:1px solid #D1D9E0;border-radius:8px;font-size:14px;color:#1B2A4A;margin-bottom:12px;background:#fff">
-      <option value="employee">Employee</option>
-      <option value="supervisor">Supervisor</option>
-    </select></div>
-    <button onclick="loginUser()" style="width:100%;background:#028090;color:#fff;border:none;padding:11px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">Start →</button>
+    <h2 style="font-size:18px;font-weight:700;color:#1B2A4A;margin-bottom:6px">Welcome</h2>
+    <p style="font-size:13px;color:#64748B;margin-bottom:1.5rem">Sign in to continue</p>
+    <input type="text" id="login-name" placeholder="Username" style="width:100%;padding:10px 14px;border:1px solid #D1D9E0;border-radius:8px;font-size:14px;color:#1B2A4A;outline:none;margin-bottom:10px" onkeydown="if(event.key==='Enter')document.getElementById('login-pass').focus()">
+    <input type="password" id="login-pass" placeholder="Password" style="width:100%;padding:10px 14px;border:1px solid #D1D9E0;border-radius:8px;font-size:14px;color:#1B2A4A;outline:none;margin-bottom:12px" onkeydown="if(event.key==='Enter')loginUser()">
+    <div id="login-error" style="display:none;background:#FEE2E2;color:#991B1B;border-radius:6px;padding:8px;font-size:12px;margin-bottom:10px"></div>
+    <button onclick="loginUser()" style="width:100%;background:#028090;color:#fff;border:none;padding:11px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">Sign in →</button>
   </div>
 </div>
 
@@ -429,6 +427,30 @@ tr:hover td{background:#FAFCFD}
   <!-- SETTINGS TAB -->
   <div id="tab-settings" style="display:none">
     <div class="card">
+      <div class="card-title">User Management</div>
+      <div id="user-list" style="margin-bottom:14px"></div>
+      <div style="border-top:1px solid #F1F5F9;padding-top:14px">
+        <div class="form-row r2" style="margin-bottom:10px">
+          <div class="fg"><label>Username</label><input type="text" id="new-username" placeholder="e.g. Ramesh"></div>
+          <div class="fg"><label>Password</label><input type="password" id="new-password" placeholder="Password"></div>
+        </div>
+        <div class="form-row r2" style="margin-bottom:10px">
+          <div class="fg"><label>Full Name</label><input type="text" id="new-fullname" placeholder="e.g. Ramesh Kumar"></div>
+          <div class="fg"><label>Role</label>
+            <select id="new-role">
+              <option value="employee">Employee</option>
+              <option value="supervisor">Supervisor</option>
+              <option value="owner">Owner</option>
+            </select>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn-primary" onclick="addUser()">Add User</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
       <div class="card-title">Google Sheets sync</div>
       <p style="font-size:13px;color:#64748B;margin-bottom:14px;line-height:1.6">
         Connect to Google Sheets so the owner can see all expenses live from any device.
@@ -634,15 +656,129 @@ const CATS = {
 
 function todayStr() { return new Date().toISOString().split('T')[0]; }
 
-function autoDetectRole() {
-  const name = document.getElementById('login-name').value.trim().toLowerCase();
-  const roleEl = document.getElementById('login-role');
-  const roleRow = document.getElementById('login-role-row');
-  if(name === 'vijay' || name === 'ankit') {
-    roleRow.style.display = 'none';
+// ── USER MANAGEMENT ──────────────────────────────────────────────────────────
+const DEFAULT_USERS = [{ username:'admin', password:'admin123', fullname:'Admin', role:'owner' }];
+let cachedUsers = null;
+
+async function fetchUsers() {
+  if(!sheetUrl) return DEFAULT_USERS;
+  try {
+    const res = await fetch(sheetUrl + '?action=getUsers');
+    const data = await res.json();
+    if(data.success && data.users && data.users.length > 0) {
+      cachedUsers = data.users;
+      return data.users;
+    }
+  } catch(e) {}
+  return cachedUsers || DEFAULT_USERS;
+}
+
+async function saveUsersToSheet(users) {
+  if(!sheetUrl) return;
+  try {
+    const encoded = encodeURIComponent(JSON.stringify(users));
+    await fetch(sheetUrl + '?action=saveUsers&users=' + encoded);
+  } catch(e) {}
+}
+
+function getUsers() {
+  return cachedUsers || DEFAULT_USERS;
+}
+
+async function addUser() {
+  const username = document.getElementById('new-username').value.trim();
+  const password = document.getElementById('new-password').value.trim();
+  const fullname = document.getElementById('new-fullname').value.trim();
+  const role     = document.getElementById('new-role').value;
+  if(!username||!password||!fullname){ alert('Please fill in all fields.'); return; }
+  const users = getUsers();
+  if(users.find(u=>u.username.toLowerCase()===username.toLowerCase())){ alert('Username already exists.'); return; }
+  users.push({username, password, fullname, role});
+  cachedUsers = users;
+  await saveUsersToSheet(users);
+  document.getElementById('new-username').value='';
+  document.getElementById('new-password').value='';
+  document.getElementById('new-fullname').value='';
+  renderUserList();
+  showGlobalNotice('User added successfully.','success');
+}
+
+async function deleteUser(username) {
+  if(username==='admin'){ alert('Cannot delete the default admin user.'); return; }
+  if(!confirm(`Delete user "${username}"?`)) return;
+  const users = getUsers().filter(u=>u.username!==username);
+  cachedUsers = users;
+  await saveUsersToSheet(users);
+  renderUserList();
+  showGlobalNotice('User removed.','success');
+}
+
+function renderUserList() {
+  const users = getUsers();
+  const el = document.getElementById('user-list');
+  if(!el) return;
+  if(!users.length){ el.innerHTML='<p style="font-size:13px;color:#94A3B8">No users yet.</p>'; return; }
+  el.innerHTML = users.map(u=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #F1F5F9">
+      <div>
+        <span style="font-size:13px;font-weight:600;color:#1B2A4A">${u.fullname}</span>
+        <span style="font-size:11px;color:#64748B;margin-left:8px">@${u.username}</span>
+        <span class="badge ${u.role==='owner'?'b-approved':u.role==='supervisor'?'b-porter':'b-pending'}" style="margin-left:6px">${u.role}</span>
+      </div>
+      ${u.username==='admin'?'<span style="font-size:11px;color:#94A3B8">default</span>':`<button class="btn-sm btn-reject" onclick="deleteUser('${u.username}')">Remove</button>`}
+    </div>`).join('');
+}
+
+function autoDetectRole() {}
+
+async function loginUser() {
+  const username = document.getElementById('login-name').value.trim();
+  const password = document.getElementById('login-pass').value.trim();
+  const errEl = document.getElementById('login-error');
+  if(!username||!password){ errEl.textContent='Please enter username and password.'; errEl.style.display='block'; return; }
+
+  // Show loading
+  const btn = document.querySelector('#login-screen button');
+  btn.textContent = 'Signing in...'; btn.disabled = true;
+
+  const users = await fetchUsers();
+  const user = users.find(u=>u.username.toLowerCase()===username.toLowerCase() && u.password===password);
+
+  btn.textContent = 'Sign in →'; btn.disabled = false;
+
+  if(!user){ errEl.textContent='Incorrect username or password.'; errEl.style.display='block'; return; }
+  errEl.style.display='none';
+
+  currentUser = user.fullname;
+  currentRole = user.role;
+  localStorage.setItem('fpe_username', user.fullname);
+  localStorage.setItem('fpe_role', user.role);
+
+  document.getElementById('i-staff').value = user.fullname;
+  const dateEl = document.getElementById('i-date');
+  if(dateEl){ dateEl.value = todayStr(); dateEl.max = todayStr(); }
+  document.getElementById('user-name-display').textContent = user.fullname + ' (' + user.role + ')';
+  setupTabsForRole(user.role);
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('main-app').style.display = 'block';
+  toggleFields();
+
+  if(user.role === 'owner') { managerUnlocked = true; updateApprovalTitle(); }
+
+  updateSyncStatus();
+  if(sheetUrl) {
+    if(user.role === 'owner' || user.role === 'supervisor') {
+      pullAllFromSheet().then(()=>{ renderAll(); });
+    } else {
+      pullFromSheet();
+    }
   } else {
-    roleRow.style.display = 'block';
+    renderAll();
   }
+
+  if(user.role === 'owner') showTab('owner', document.getElementById('tab-btn-owner'));
+  else if(user.role === 'supervisor') showTab('approval', document.getElementById('tab-btn-approval'));
+  else showTab('add', document.getElementById('tab-btn-add'));
 }
 
 let currentUser = '';
@@ -692,66 +828,6 @@ function init() {
 function showLoginScreen() {
   document.getElementById('login-screen').style.display = 'flex';
   document.getElementById('main-app').style.display = 'none';
-}
-
-function loginUser() {
-  const name = document.getElementById('login-name').value.trim();
-  if (!name) { alert('Please enter your name.'); return; }
-
-  const nameLower = name.toLowerCase();
-  let assignedRole = document.getElementById('login-role').value;
-
-  // PIN check for Vijay (supervisor)
-  if (nameLower === 'vijay') {
-    const pin = prompt('Enter supervisor PIN:');
-    if (btoa(pin) !== btoa('4465')) { alert('Incorrect PIN. Access denied.'); return; }
-    assignedRole = 'supervisor';
-  }
-  // PIN check for Ankit (owner)
-  else if (nameLower === 'ankit') {
-    const pin = prompt('Enter owner PIN:');
-    if (btoa(pin) !== btoa('2204')) { alert('Incorrect PIN. Access denied.'); return; }
-    assignedRole = 'owner';
-  }
-
-  currentUser = name;
-  currentRole = assignedRole;
-  localStorage.setItem('fpe_username', name);
-  localStorage.setItem('fpe_role', assignedRole);
-
-  document.getElementById('i-staff').value = name;
-  const dateEl = document.getElementById('i-date');
-  if(dateEl){ dateEl.value = todayStr(); dateEl.max = todayStr(); }
-  document.getElementById('user-name-display').textContent = name + ' (' + assignedRole + ')';
-  setupTabsForRole(assignedRole);
-  document.getElementById('login-screen').style.display = 'none';
-  document.getElementById('main-app').style.display = 'block';
-  toggleFields();
-
-  if (assignedRole === 'owner') {
-    managerUnlocked = true;
-    updateApprovalTitle();
-  }
-
-  updateSyncStatus();
-  if (sheetUrl) {
-    if (assignedRole === 'owner' || assignedRole === 'supervisor') {
-      pullAllFromSheet().then(() => { renderAll(); });
-    } else {
-      pullFromSheet();
-    }
-  } else {
-    renderAll();
-  }
-
-  // Default tab based on role
-  if (assignedRole === 'owner') {
-    showTab('owner', document.getElementById('tab-btn-owner'));
-  } else if (assignedRole === 'supervisor') {
-    showTab('approval', document.getElementById('tab-btn-approval'));
-  } else {
-    showTab('add', document.getElementById('tab-btn-add'));
-  }
 }
 
 function setupTabsForRole(role) {
@@ -866,9 +942,17 @@ function addExpense() {
   }
 
   // Re-read counter from storage to handle multiple tabs
+  // Year-aware counter — reset when year changes
+  const thisYear = new Date().getFullYear();
+  const savedYear = parseInt(localStorage.getItem('fpe_counter_year')||'0');
+  if(savedYear !== thisYear) {
+    expenseCounter = 0;
+    localStorage.setItem('fpe_counter_year', thisYear);
+    localStorage.setItem('fpe_counter', '0');
+  }
   expenseCounter = parseInt(localStorage.getItem('fpe_counter')||'0') + 1;
   localStorage.setItem('fpe_counter', expenseCounter);
-  const refNum = 'APL-' + new Date().getFullYear() + '-' + String(expenseCounter).padStart(4,'0');
+  const refNum = 'EXP-' + thisYear + '-' + String(expenseCounter).padStart(4,'0');
   const location = document.getElementById('i-location').value;
   expenses.unshift({
     id: Date.now(), ref: refNum, staff, role: currentRole, location, date, cat, amount, desc,
@@ -975,7 +1059,7 @@ function fmtDate(d) {
 
 function renderAll() {
   renderSummary(); renderLog(); renderApproval();
-  if(currentRole==='owner') renderOwner();
+  if(currentRole==='owner') { renderOwner(); renderUserList(); }
 }
 
 function renderSummary() {
@@ -1597,8 +1681,18 @@ function saveAdvance() {
   const newAdv = { id:Date.now(), staff, location, amount, date, notes };
   advances.push(newAdv);
   localStorage.setItem('fpe_advances', JSON.stringify(advances));
+  // Generate advance ref number with year-aware counter
+  const advYear = new Date().getFullYear();
+  const savedAdvYear = parseInt(localStorage.getItem('fpe_adv_counter_year')||'0');
+  if(savedAdvYear !== advYear) {
+    localStorage.setItem('fpe_adv_counter_year', advYear);
+    localStorage.setItem('fpe_adv_counter', '0');
+  }
+  const advCounter = parseInt(localStorage.getItem('fpe_adv_counter')||'0') + 1;
+  localStorage.setItem('fpe_adv_counter', advCounter);
+  const advRef = 'ADV-' + advYear + '-' + String(advCounter).padStart(4,'0');
   // Sync advance to sheet as a special record
-  if(sheetUrl) pushOne({id:newAdv.id, ref:'ADV-'+newAdv.id, staff, location, date, cat:'advance', amount, desc:'Cash advance'+(notes?': '+notes:''), status:'advance', approvedBy:currentUser, role:'owner'});
+  if(sheetUrl) pushOne({id:newAdv.id, ref:advRef, staff, location, date, cat:'advance', amount, desc:'Cash advance'+(notes?': '+notes:''), status:'advance', approvedBy:currentUser, role:'owner'});
   closeAdvanceModal();
   renderAdvances();
   showGlobalNotice(`Advance of ₹${amount.toLocaleString('en-IN')} recorded for ${staff}.`,'success');
@@ -1658,6 +1752,9 @@ function clearAll() {
   expenses = []; expenseCounter = 0;
   save();
   localStorage.removeItem('fpe_counter');
+  localStorage.removeItem('fpe_counter_year');
+  localStorage.removeItem('fpe_adv_counter');
+  localStorage.removeItem('fpe_adv_counter_year');
   renderAll();
   showGlobalNotice('All data cleared.','info');
 }
