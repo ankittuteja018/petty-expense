@@ -1407,7 +1407,6 @@ function showPhoto(src) {
 }
 
 async function addExpense() {
-  if(!navigator.onLine){ alert('No internet connection. Please connect and try again.'); return; }
   const staff  = document.getElementById('i-staff').value.trim();
   const date   = document.getElementById('i-date').value;
   const cat    = document.getElementById('i-cat').value;
@@ -1417,71 +1416,56 @@ async function addExpense() {
   const vphone = document.getElementById('i-vphone').value.trim();
   const vaddr  = document.getElementById('i-vaddr').value.trim();
 
-  if (!staff)  { alert('Please enter staff name.'); return; }
+  if (!staff)  { alert('Staff name is missing. Please refresh and try again.'); return; }
   if (!date)   { alert('Please select a date.'); return; }
-  const monthCheck = isExpenseAllowed(date, cat);
-  if(!monthCheck.allowed){ alert(monthCheck.reason); return; }
   if (!amount || amount<=0) { alert('Please enter a valid amount.'); return; }
   if (!desc)   { alert('Please enter a description.'); return; }
   if (vendorRequired()) {
     if (!vname)  { alert('Vendor name is required for this category.'); return; }
-    if (!vphone) { alert('Vendor Contact is required for this category.'); return; }
-    if (!/^[0-9]{10}$/.test(vphone.replace(/\s/g,''))) { alert('Vendor Contact must be a 10-digit phone number.'); return; }
-    if (!vaddr)  { alert('Vendor Address is required for this category.'); return; }
+    if (!vphone) { alert('Vendor Contact is required.'); return; }
+    if (!/^[0-9]{10}$/.test(vphone.replace(/\s/g,''))) { alert('Vendor Contact must be 10 digits.'); return; }
+    if (!vaddr)  { alert('Vendor Address is required.'); return; }
   }
-  if (!photoData.length) { alert('Photo proof is compulsory. Please upload a photo.'); return; }
-  // Duplicate detection
-  const dup = expenses.find(e => e.staff===staff && e.date===date && e.cat===cat && e.amount===amount && e.status!=='rejected');
-  if(dup) {
-    if(!confirm(`Warning: You already submitted a ₹${amount} ${CATS[cat]?.label||cat} expense on ${fmtDate(date)}. Submit anyway?`)) return;
-  }
+  if (!photoData.length) { alert('Please upload a photo of the bill/receipt.'); return; }
 
-  // Show loading on button
   const submitBtn = document.querySelector('#tab-add .btn-primary');
+  if(submitBtn){ submitBtn.disabled=true; submitBtn.textContent='Submitting...'; }
 
+  const year = new Date().getFullYear();
+  let refNum = 'EXP-' + year + '-' + String(Date.now()).slice(-4);
   try {
-    if(submitBtn){ submitBtn.disabled=true; submitBtn.textContent='Submitting...'; }
+    const cres = await fetch(sheetUrl + '?action=nextCounter&key=EXP-' + year);
+    const cdata = await cres.json();
+    if(cdata.success) refNum = 'EXP-' + year + '-' + String(cdata.value).padStart(4,'0');
+  } catch(e) {}
 
-    // Get ref number from sheet counter
-    const year = new Date().getFullYear();
-    let refNum = 'EXP-' + year + '-0001';
-    try {
-      const cres = await fetch(sheetUrl + '?action=nextCounter&key=' + encodeURIComponent('EXP-'+year));
-      const cdata = await cres.json();
-      if(cdata.success) refNum = 'EXP-' + year + '-' + String(cdata.value).padStart(4,'0');
-    } catch(e) {
-      refNum = 'EXP-' + year + '-' + String(Date.now()).slice(-4);
-    }
-    const location = document.getElementById('i-location').value;
-    const newExp = {
-      id: Date.now(), ref: refNum, staff, role: currentRole, location, date, cat, amount, desc,
-      from:    document.getElementById('i-from').value.trim(),
-      to:      document.getElementById('i-to').value.trim(),
-      rider:   document.getElementById('i-rider').value.trim(),
-      vehicle: document.getElementById('i-vehicle').value.trim(),
-      vname, vphone, vaddr,
-      vinv:    document.getElementById('i-vinv').value.trim(),
-      photos:  [...photoData],
-      status:  (currentRole === 'supervisor' && amount <= 2000) ? 'auto-approved' : 'pending',
-      submittedAt: new Date().toISOString()
-    };
-    expenses.unshift(newExp);
-    clearForm();
-    if(submitBtn){ submitBtn.disabled=false; submitBtn.textContent='Submit for approval'; }
-    renderAll();
-    await pushOne(newExp);
-    syncToSheet(true);
-    if(currentRole === 'supervisor' && newExp.amount <= 2000) {
-      showGlobalNotice('Expense submitted and auto-approved (under ₹2,000).', 'success');
-    } else {
-      showGlobalNotice('Expense submitted — pending approval.', 'success');
-    }
-    showTab('log', document.querySelectorAll('.tab')[1]);
-  } catch(err) {
-    if(submitBtn){ submitBtn.disabled=false; submitBtn.textContent='Submit for approval'; }
-    showGlobalNotice('Error: ' + err.message, 'error');
-    console.error('addExpense error:', err);
+  const location = document.getElementById('i-location').value;
+  const newExp = {
+    id: Date.now(), ref: refNum, staff, role: currentRole, location, date, cat, amount, desc,
+    from: document.getElementById('i-from').value.trim(),
+    to: document.getElementById('i-to').value.trim(),
+    rider: document.getElementById('i-rider').value.trim(),
+    vehicle: document.getElementById('i-vehicle').value.trim(),
+    vname, vphone, vaddr,
+    vinv: document.getElementById('i-vinv').value.trim(),
+    photos: [...photoData],
+    status: (currentRole === 'supervisor' && amount <= 2000) ? 'auto-approved' : 'pending',
+    submittedAt: new Date().toISOString()
+  };
+
+  expenses.unshift(newExp);
+  clearForm();
+  if(submitBtn){ submitBtn.disabled=false; submitBtn.textContent='Submit for approval'; }
+  renderAll();
+
+  pushOne(newExp).catch(e=>console.error('push failed',e));
+
+  if(currentRole === 'supervisor' && newExp.amount <= 2000) {
+    showGlobalNotice('Expense submitted and auto-approved (under ₹2,000).', 'success');
+  } else {
+    showGlobalNotice('Expense submitted — pending approval.', 'success');
   }
+  showTab('log', document.querySelectorAll('.tab')[1]);
 }
 
 function clearForm() {
