@@ -1254,16 +1254,40 @@ async function loadFromSheet() {
   if(!sheetUrl) return;
   showLoadingOverlay(true);
   try {
-    let url;
     if(currentRole==='owner'||currentRole==='supervisor') {
-      url = sheetUrl + '?action=getAll';
+      // Owner and supervisor load everything
+      const res = await fetch(sheetUrl + '?action=getAll');
+      const data = await res.json();
+      if(data.success && data.expenses) {
+        expenses = data.expenses.map(e=>({...e, id: Number(e.id)||e.id, photos:[]}));
+      }
     } else {
-      url = sheetUrl + '?action=getByStaff&staff=' + encodeURIComponent(currentUser);
-    }
-    const res = await fetch(url);
-    const data = await res.json();
-    if(data.success && data.expenses) {
-      expenses = data.expenses.map(e=>({...e, id: Number(e.id)||e.id, photos:[]}));
+      // Employee: load own expenses + ALL advances (to find ones given by owner)
+      const [expRes, advRes] = await Promise.all([
+        fetch(sheetUrl + '?action=getByStaff&staff=' + encodeURIComponent(currentUser)),
+        fetch(sheetUrl + '?action=getAll')
+      ]);
+      const expData = await expRes.json();
+      const advData = await advRes.json();
+
+      let myExpenses = [];
+      if(expData.success && expData.expenses) {
+        myExpenses = expData.expenses.map(e=>({...e, id: Number(e.id)||e.id, photos:[]}));
+      }
+
+      // Add advances for this employee that may have been entered by owner
+      if(advData.success && advData.expenses) {
+        const allAdvances = advData.expenses
+          .filter(e=>(e.cat==='advance'||e.status==='advance') &&
+            e.staff.trim().toLowerCase()===currentUser.trim().toLowerCase())
+          .map(e=>({...e, id: Number(e.id)||e.id, photos:[]}));
+
+        // Merge — avoid duplicates
+        const myIds = new Set(myExpenses.map(e=>String(e.id)));
+        allAdvances.forEach(a=>{ if(!myIds.has(String(a.id))) myExpenses.push(a); });
+      }
+
+      expenses = myExpenses;
     }
   } catch(err) {
     showGlobalNotice('Could not load from sheet. Check connection.','error');
@@ -1405,14 +1429,16 @@ async function addExpense() {
     if (!/^[0-9]{10}$/.test(vphone.replace(/\s/g,''))) { alert('Vendor Contact must be a 10-digit phone number.'); return; }
     if (!vaddr)  { alert('Vendor Address is required for this category.'); return; }
   }
-  if (!photoData.length) { alert('Photo Proof is compulsory. Please upload at least one photo.'); return; }
+  if (!photoData.length) { showGlobalNotice('Photo proof is compulsory. Please upload a photo before submitting.','error'); return; }
   // Duplicate detection
   const dup = expenses.find(e => e.staff===staff && e.date===date && e.cat===cat && e.amount===amount && e.status!=='rejected');
   if(dup) {
     if(!confirm(`Warning: You already submitted a ₹${amount} ${CATS[cat]?.label||cat} expense on ${fmtDate(date)}. Submit anyway?`)) return;
   }
 
-  // Re-read counter from storage to handle multiple tabs
+  try {
+  if(submitBtn){ submitBtn.disabled=true; submitBtn.textContent='Submitting...'; }
+
   // Get ref number from sheet counter
   const year = new Date().getFullYear();
   let refNum = 'EXP-' + year + '-0001';
@@ -1439,6 +1465,8 @@ async function addExpense() {
   // Add to local cache immediately for instant UI update
   expenses.unshift(newExp);
   clearForm();
+  // Restore button
+  if(submitBtn){ submitBtn.disabled=false; submitBtn.textContent='Submit for approval'; }
   renderAll();
   // Write to sheet
   await pushOne(newExp);
@@ -1448,7 +1476,12 @@ async function addExpense() {
   } else {
     showGlobalNotice('Expense submitted — pending approval.', 'success');
   }
-  showTab('log', document.querySelectorAll('.tab')[1]);
+    showTab('log', document.querySelectorAll('.tab')[1]);
+  } catch(err) {
+    if(submitBtn){ submitBtn.disabled=false; submitBtn.textContent='Submit for approval'; }
+    showGlobalNotice('Error submitting expense: ' + err.message, 'error');
+    console.error('addExpense error:', err);
+  }
 }
 
 function clearForm() {
@@ -2078,10 +2111,35 @@ function renderTrend() {
 }
 
 function openAdvanceReceivedModal() {
-  const el = document.getElementById('advr-date');
-  if(el){ el.value = todayStr(); el.max = todayStr(); }
+  // Always reset the new section first to ensure form elements exist
+  const newSection = document.getElementById('advr-new-section');
+  newSection.innerHTML = `
+    <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:10px;padding-top:10px;border-top:1px solid var(--border)">
+      Owner hasn't recorded an advance yet? Add it yourself:
+    </div>
+    <div class="form-row r2" style="margin-bottom:10px">
+      <div class="fg"><label>Amount (₹) *</label><input type="number" id="advr-amount" placeholder="0" min="0"></div>
+      <div class="fg"><label>Date *</label><input type="date" id="advr-date"></div>
+    </div>
+    <div class="form-row r2" style="margin-bottom:10px">
+      <div class="fg"><label>Location *</label>
+        <select id="advr-location"><option value="Vijay Nagar">Vijay Nagar</option><option value="Lal Kuan">Lal Kuan</option></select>
+      </div>
+      <div class="fg"><label>Received from *</label><input type="text" id="advr-from" placeholder="e.g. Ankit"></div>
+    </div>
+    <div class="form-row" style="margin-bottom:10px">
+      <div class="fg"><label>Notes</label><input type="text" id="advr-notes" placeholder="Optional"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-ghost" onclick="closeAdvanceReceivedModal()">Close</button>
+      <button class="btn-primary" onclick="saveAdvanceReceived()">Save advance</button>
+    </div>`;
 
-  // Load existing advances for this staff member from sheet
+  // Set date default
+  const dateEl = document.getElementById('advr-date');
+  if(dateEl){ dateEl.value = todayStr(); dateEl.max = todayStr(); }
+
+  // Load existing advances for this staff member
   const myAdvances = expenses.filter(e=>
     (e.cat==='advance'||e.status==='advance') &&
     e.staff.trim().toLowerCase() === currentUser.trim().toLowerCase()
@@ -2104,9 +2162,8 @@ function openAdvanceReceivedModal() {
           </div>`).join('')}
         <div style="padding-top:8px;font-size:13px;font-weight:700;color:var(--text)">Total: ₹${total.toLocaleString('en-IN')}</div>
       </div>`;
-    // If owner already entered — hide the new entry form
+    // If owner already entered — replace form with message
     const ownerEntered = myAdvances.some(a=>a.role==='owner');
-    const newSection = document.getElementById('advr-new-section');
     if(ownerEntered) {
       newSection.innerHTML = `
         <div style="background:#D1FAE5;border-radius:8px;padding:12px;margin-top:8px;font-size:13px;color:#065F46;font-weight:500">
@@ -2125,31 +2182,6 @@ function openAdvanceReceivedModal() {
 
 function closeAdvanceReceivedModal() {
   document.getElementById('advance-received-modal').classList.remove('open');
-  // Reset the new section in case it was replaced
-  const newSection = document.getElementById('advr-new-section');
-  if(newSection && !newSection.querySelector('#advr-amount')) {
-    newSection.innerHTML = `
-      <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:10px;padding-top:10px;border-top:1px solid var(--border)">
-        Owner hasn't recorded an advance yet? Add it yourself:
-      </div>
-      <div class="form-row r2" style="margin-bottom:10px">
-        <div class="fg"><label>Amount (₹) *</label><input type="number" id="advr-amount" placeholder="0" min="0"></div>
-        <div class="fg"><label>Date *</label><input type="date" id="advr-date"></div>
-      </div>
-      <div class="form-row r2" style="margin-bottom:10px">
-        <div class="fg"><label>Location *</label>
-          <select id="advr-location"><option value="Vijay Nagar">Vijay Nagar</option><option value="Lal Kuan">Lal Kuan</option></select>
-        </div>
-        <div class="fg"><label>Received from *</label><input type="text" id="advr-from" placeholder="e.g. Ankit"></div>
-      </div>
-      <div class="form-row" style="margin-bottom:10px">
-        <div class="fg"><label>Notes</label><input type="text" id="advr-notes" placeholder="Optional"></div>
-      </div>
-      <div class="btn-row">
-        <button class="btn-ghost" onclick="closeAdvanceReceivedModal()">Close</button>
-        <button class="btn-primary" onclick="saveAdvanceReceived()">Save advance</button>
-      </div>`;
-  }
 }
 document.getElementById('advance-received-modal').addEventListener('click', function(ev){ if(ev.target===this) closeAdvanceReceivedModal(); });
 
