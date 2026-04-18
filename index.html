@@ -1564,6 +1564,9 @@ function fmtDate(d) {
 }
 
 function renderAll() {
+  // Always ensure staff name is set
+  const staffEl = document.getElementById('i-staff');
+  if(staffEl && currentUser) staffEl.value = currentUser;
   renderSummary(); renderLog(); renderApproval();
   if(currentRole==='owner') { renderOwner(); renderUserList(); renderCatBudgetInputs(); }
   checkRejectionNotifications();
@@ -2096,6 +2099,139 @@ function renderMonthClosing() {
         </div>`).join('');
     }
   }
+}
+
+// ── CATEGORY BUDGETS ──────────────────────────────────────────────────────────
+function getCatBudgets() {
+  try { return JSON.parse(localStorage.getItem('fpe_cat_budgets')||'{}'); } catch(e) { return {}; }
+}
+
+function renderCatBudgetInputs() {
+  const el = document.getElementById('cat-budget-list');
+  if(!el) return;
+  const budgets = getCatBudgets();
+  el.innerHTML = Object.entries(CATS).map(([key,cat])=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border)">
+      <span class="badge ${cat.cls}" style="min-width:120px">${cat.label}</span>
+      <input type="number" id="catbudget-${key}" value="${budgets[key]||''}" placeholder="No limit" min="0"
+        style="width:140px;padding:6px 10px;border:1px solid var(--input-border);border-radius:6px;font-size:13px;color:var(--text);background:var(--input-bg)">
+      <span style="font-size:12px;color:var(--text-muted)">₹ / month</span>
+    </div>`).join('');
+}
+
+function saveCatBudgets() {
+  const budgets = {};
+  Object.keys(CATS).forEach(key=>{
+    const el = document.getElementById('catbudget-'+key);
+    if(el && el.value) budgets[key] = parseFloat(el.value);
+  });
+  localStorage.setItem('fpe_cat_budgets', JSON.stringify(budgets));
+  showGlobalNotice('Category budgets saved.','success');
+}
+
+function checkCatBudgetWarnings() {
+  if(currentRole !== 'owner' && currentRole !== 'supervisor') return;
+  const budgets = getCatBudgets();
+  if(!Object.keys(budgets).length) return;
+  const month = todayStr().slice(0,7);
+  const monthExpenses = expenses.filter(e=>e.date&&e.date.startsWith(month)&&(e.status==='approved'||e.status==='auto-approved'));
+  const catTotals = {};
+  monthExpenses.forEach(e=>{ catTotals[e.cat]=(catTotals[e.cat]||0)+e.amount; });
+  Object.entries(budgets).forEach(([cat,limit])=>{
+    const spent = catTotals[cat]||0;
+    const pct = spent/limit;
+    if(pct>=1) {
+      showGlobalNotice(`⚠️ ${CATS[cat]?.label} budget EXCEEDED! Spent ₹${spent.toLocaleString('en-IN')} of ₹${limit.toLocaleString('en-IN')}`, 'error');
+    } else if(pct>=0.8) {
+      showGlobalNotice(`⚠️ ${CATS[cat]?.label} budget at ${Math.round(pct*100)}% — ₹${spent.toLocaleString('en-IN')} of ₹${limit.toLocaleString('en-IN')}`, 'info');
+    }
+  });
+}
+
+// ── STAFF BALANCE SHEET ───────────────────────────────────────────────────────
+function renderBalanceSheet() {
+  const el = document.getElementById('balance-tbody');
+  const tf = document.getElementById('balance-tfoot');
+  if(!el) return;
+  const advanceRows = expenses.filter(e=>e.cat==='advance'||e.status==='advance');
+  const expenseRows = expenses.filter(e=>(e.status==='approved'||e.status==='auto-approved')&&e.cat!=='advance');
+  const staffSet = new Set([...advanceRows.map(e=>e.staff.trim()),...expenseRows.map(e=>e.staff.trim())]);
+  if(!staffSet.size){ el.innerHTML='<tr><td colspan="5" class="empty-state">No data yet.</td></tr>'; if(tf) tf.innerHTML=''; return; }
+  let totalAdv=0, totalExp=0;
+  const rows = [...staffSet].map(staff=>{
+    const adv = advanceRows.filter(e=>e.staff.trim().toLowerCase()===staff.toLowerCase()).reduce((s,e)=>s+e.amount,0);
+    const exp = expenseRows.filter(e=>e.staff.trim().toLowerCase()===staff.toLowerCase()).reduce((s,e)=>s+e.amount,0);
+    const bal = adv - exp;
+    totalAdv+=adv; totalExp+=exp;
+    const balColor = bal>0?'#F59E0B':bal<0?'#EF4444':'#10B981';
+    return `<tr>
+      <td style="font-weight:600">${staff}</td>
+      <td style="text-align:right">₹${adv.toLocaleString('en-IN')}</td>
+      <td style="text-align:right">₹${exp.toLocaleString('en-IN')}</td>
+      <td style="text-align:right;font-weight:700;color:${balColor}">₹${Math.abs(bal).toLocaleString('en-IN')}</td>
+      <td><span class="badge ${bal>0?'b-pending':bal<0?'b-rejected':'b-approved'}">${bal>0?'Advance pending':bal<0?'Overspent':'Settled'}</span></td>
+    </tr>`;
+  });
+  el.innerHTML = rows.join('');
+  const totalBal = totalAdv - totalExp;
+  if(tf) tf.innerHTML = `<tr class="tfoot-row">
+    <td style="padding:9px 10px;font-size:12px">Total — ${staffSet.size} staff</td>
+    <td style="text-align:right;padding:9px 10px">₹${totalAdv.toLocaleString('en-IN')}</td>
+    <td style="text-align:right;padding:9px 10px">₹${totalExp.toLocaleString('en-IN')}</td>
+    <td style="text-align:right;padding:9px 10px;font-weight:700;color:${totalBal>0?'#F59E0B':'#10B981'}">₹${Math.abs(totalBal).toLocaleString('en-IN')}</td>
+    <td></td>
+  </tr>`;
+}
+
+// ── EXPORT BY STAFF ───────────────────────────────────────────────────────────
+function exportByStaff() {
+  const staff = prompt('Enter staff name to export (leave blank for all):');
+  if(staff === null) return;
+  const data = staff.trim()
+    ? expenses.filter(e=>e.staff.toLowerCase()===staff.trim().toLowerCase())
+    : expenses;
+  if(!data.length){ alert('No expenses found.'); return; }
+  const h = ['Ref','Date','Staff','Location','Category','Description','Vendor Name','Vendor Contact','Vendor Address','Invoice No','Amount','Status','Approved By','Rejection Reason'];
+  const rows = data.map(e=>[
+    e.ref||'', e.date, e.staff, e.location||'', CATS[e.cat]?.label||e.cat, e.desc,
+    e.vname||'', e.vphone||'', e.vaddr||'', e.vinv||'',
+    e.amount, e.status, e.approvedBy||'', e.rejectionRemark||''
+  ]);
+  const csv = [h,...rows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const filename = staff.trim() ? `expenses_${staff.trim().replace(/\s+/g,'_')}.csv` : 'expenses_all.csv';
+  const url = URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'}));
+  const a = document.createElement('a'); a.href=url; a.download=filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── BULK DELETE ──────────────────────────────────────────────────────────────
+function toggleLogChecks(master) {
+  document.querySelectorAll('.log-chk').forEach(c => c.checked = master.checked);
+  updateBulkDeleteBtn();
+}
+
+function updateBulkDeleteBtn() {
+  const checked = document.querySelectorAll('.log-chk:checked').length;
+  const btn = document.getElementById('bulk-delete-btn');
+  if(btn) btn.style.display = checked > 0 ? 'inline-block' : 'none';
+}
+
+async function bulkDelete() {
+  const checked = Array.from(document.querySelectorAll('.log-chk:checked')).map(c=>c.dataset.id);
+  if(!checked.length) return;
+  const hasApproved = checked.some(id=>{
+    const e = expenses.find(x=>String(x.id)===id);
+    return e && (e.status==='approved'||e.status==='auto-approved');
+  });
+  if(hasApproved){ alert('Some selected expenses are approved and cannot be deleted. Deselect them and try again.'); return; }
+  if(!confirm(`Delete ${checked.length} expense(s)? This cannot be undone.`)) return;
+  for(const id of checked) {
+    const e = expenses.find(x=>String(x.id)===id);
+    if(e) { e.status='deleted'; await pushOne(e); }
+  }
+  expenses = expenses.filter(x=>!checked.includes(String(x.id)));
+  renderAll();
+  showGlobalNotice(`${checked.length} expense(s) deleted.`,'success');
 }
 
 function switchOwnerView(view, btn) {
