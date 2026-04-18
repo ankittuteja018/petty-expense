@@ -1436,50 +1436,50 @@ async function addExpense() {
     if(!confirm(`Warning: You already submitted a ₹${amount} ${CATS[cat]?.label||cat} expense on ${fmtDate(date)}. Submit anyway?`)) return;
   }
 
-  try {
-  if(submitBtn){ submitBtn.disabled=true; submitBtn.textContent='Submitting...'; }
+  // Show loading on button
+  const submitBtn = document.querySelector('#tab-add .btn-primary');
 
-  // Get ref number from sheet counter
-  const year = new Date().getFullYear();
-  let refNum = 'EXP-' + year + '-0001';
   try {
-    const cres = await fetch(sheetUrl + '?action=nextCounter&key=' + encodeURIComponent('EXP-'+year));
-    const cdata = await cres.json();
-    if(cdata.success) refNum = 'EXP-' + year + '-' + String(cdata.value).padStart(4,'0');
-  } catch(e) {
-    refNum = 'EXP-' + year + '-' + String(Date.now()).slice(-4);
-  }
-  const location = document.getElementById('i-location').value;
-  const newExp = {
-    id: Date.now(), ref: refNum, staff, role: currentRole, location, date, cat, amount, desc,
-    from:    document.getElementById('i-from').value.trim(),
-    to:      document.getElementById('i-to').value.trim(),
-    rider:   document.getElementById('i-rider').value.trim(),
-    vehicle: document.getElementById('i-vehicle').value.trim(),
-    vname, vphone, vaddr,
-    vinv:    document.getElementById('i-vinv').value.trim(),
-    photos:  [...photoData],
-    status:  (currentRole === 'supervisor' && amount <= 2000) ? 'auto-approved' : 'pending',
-    submittedAt: new Date().toISOString()
-  };
-  // Add to local cache immediately for instant UI update
-  expenses.unshift(newExp);
-  clearForm();
-  // Restore button
-  if(submitBtn){ submitBtn.disabled=false; submitBtn.textContent='Submit for approval'; }
-  renderAll();
-  // Write to sheet
-  await pushOne(newExp);
-  syncToSheet(true);
-  if(currentRole === 'supervisor' && newExp.amount <= 2000) {
-    showGlobalNotice('Expense submitted and auto-approved (under ₹2,000).', 'success');
-  } else {
-    showGlobalNotice('Expense submitted — pending approval.', 'success');
-  }
+    if(submitBtn){ submitBtn.disabled=true; submitBtn.textContent='Submitting...'; }
+
+    // Get ref number from sheet counter
+    const year = new Date().getFullYear();
+    let refNum = 'EXP-' + year + '-0001';
+    try {
+      const cres = await fetch(sheetUrl + '?action=nextCounter&key=' + encodeURIComponent('EXP-'+year));
+      const cdata = await cres.json();
+      if(cdata.success) refNum = 'EXP-' + year + '-' + String(cdata.value).padStart(4,'0');
+    } catch(e) {
+      refNum = 'EXP-' + year + '-' + String(Date.now()).slice(-4);
+    }
+    const location = document.getElementById('i-location').value;
+    const newExp = {
+      id: Date.now(), ref: refNum, staff, role: currentRole, location, date, cat, amount, desc,
+      from:    document.getElementById('i-from').value.trim(),
+      to:      document.getElementById('i-to').value.trim(),
+      rider:   document.getElementById('i-rider').value.trim(),
+      vehicle: document.getElementById('i-vehicle').value.trim(),
+      vname, vphone, vaddr,
+      vinv:    document.getElementById('i-vinv').value.trim(),
+      photos:  [...photoData],
+      status:  (currentRole === 'supervisor' && amount <= 2000) ? 'auto-approved' : 'pending',
+      submittedAt: new Date().toISOString()
+    };
+    expenses.unshift(newExp);
+    clearForm();
+    if(submitBtn){ submitBtn.disabled=false; submitBtn.textContent='Submit for approval'; }
+    renderAll();
+    await pushOne(newExp);
+    syncToSheet(true);
+    if(currentRole === 'supervisor' && newExp.amount <= 2000) {
+      showGlobalNotice('Expense submitted and auto-approved (under ₹2,000).', 'success');
+    } else {
+      showGlobalNotice('Expense submitted — pending approval.', 'success');
+    }
     showTab('log', document.querySelectorAll('.tab')[1]);
   } catch(err) {
     if(submitBtn){ submitBtn.disabled=false; submitBtn.textContent='Submit for approval'; }
-    showGlobalNotice('Error submitting expense: ' + err.message, 'error');
+    showGlobalNotice('Error: ' + err.message, 'error');
     console.error('addExpense error:', err);
   }
 }
