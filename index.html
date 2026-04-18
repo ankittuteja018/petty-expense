@@ -1407,7 +1407,7 @@ function showPhoto(src) {
 }
 
 async function addExpense() {
-  if(!navigator.onLine){ showGlobalNotice('No internet connection. Please connect and try again.','error'); return; }
+  if(!navigator.onLine){ alert('No internet connection. Please connect and try again.'); return; }
   const staff  = document.getElementById('i-staff').value.trim();
   const date   = document.getElementById('i-date').value;
   const cat    = document.getElementById('i-cat').value;
@@ -1417,11 +1417,6 @@ async function addExpense() {
   const vphone = document.getElementById('i-vphone').value.trim();
   const vaddr  = document.getElementById('i-vaddr').value.trim();
 
-  // Debug — show what values we have
-  if(!staff||!date||!amount||!desc) {
-    alert('Missing: ' + (!staff?'staff ':'')+(!date?'date ':'')+(!amount?'amount ':'')+(!desc?'desc':''));
-    return;
-  }
   if (!staff)  { alert('Please enter staff name.'); return; }
   if (!date)   { alert('Please select a date.'); return; }
   const monthCheck = isExpenseAllowed(date, cat);
@@ -2042,6 +2037,65 @@ function exportCSV(filteredOnly=false) {
   const url = URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'}));
   const a = document.createElement('a'); a.href=url; a.download=`petty_expenses_${period}.csv`; a.click();
   URL.revokeObjectURL(url);
+}
+
+// ── MONTHLY CLOSING ───────────────────────────────────────────────────────────
+function getClosedMonths() {
+  try { return JSON.parse(localStorage.getItem('fpe_closed_months')||'[]'); } catch(e) { return []; }
+}
+
+function isMonthClosed(yearMonth) {
+  return getClosedMonths().includes(yearMonth);
+}
+
+function isExpenseAllowed(date, cat) {
+  const month = date.slice(0,7);
+  if(isMonthClosed(month)) return { allowed:false, reason:`${month} is closed. No new expenses allowed.` };
+  return { allowed:true };
+}
+
+function closeMonth() {
+  const sel = document.getElementById('close-month-select');
+  if(!sel||!sel.value){ alert('Select a month first.'); return; }
+  if(!confirm(`Close ${sel.value}? No new expenses or edits will be allowed for this month.`)) return;
+  const closed = getClosedMonths();
+  if(!closed.includes(sel.value)) closed.push(sel.value);
+  localStorage.setItem('fpe_closed_months', JSON.stringify(closed));
+  renderMonthClosing();
+  showGlobalNotice(`${sel.value} has been closed.`, 'success');
+}
+
+function reopenMonth() {
+  const sel = document.getElementById('close-month-select');
+  if(!sel||!sel.value){ alert('Select a month first.'); return; }
+  const closed = getClosedMonths().filter(m=>m!==sel.value);
+  localStorage.setItem('fpe_closed_months', JSON.stringify(closed));
+  renderMonthClosing();
+  showGlobalNotice(`${sel.value} has been reopened.`, 'info');
+}
+
+function renderMonthClosing() {
+  const sel = document.getElementById('close-month-select');
+  if(!sel) return;
+  const months = [];
+  const now = new Date();
+  for(let i=0; i<12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    months.push(d.toISOString().slice(0,7));
+  }
+  sel.innerHTML = months.map(m=>`<option value="${m}">${m}</option>`).join('');
+  const closed = getClosedMonths();
+  const listEl = document.getElementById('closed-months-list');
+  if(listEl) {
+    if(!closed.length) {
+      listEl.innerHTML = '<p style="font-size:13px;color:#94A3B8;margin-bottom:8px">No months closed yet.</p>';
+    } else {
+      listEl.innerHTML = closed.sort().reverse().map(m=>`
+        <div style="display:inline-flex;align-items:center;gap:6px;background:#FEF3C7;border:1px solid #FCD34D;border-radius:6px;padding:4px 10px;margin:0 6px 6px 0">
+          <span style="font-size:13px;font-weight:600;color:#92400E">🔒 ${m}</span>
+        </div>`).join('');
+    }
+  }
 }
 
 function switchOwnerView(view, btn) {
