@@ -212,6 +212,27 @@ tr:hover td{background:var(--tr-hover)}
     <div class="metric"><div class="metric-label">Approved today</div><div class="metric-value good" id="s-approved">0</div></div>
   </div>
 
+  <!-- Balance card for employee/supervisor -->
+  <div id="balance-card" style="display:none;margin-bottom:1.25rem">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 18px">
+      <div style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.6px">My Cash Balance</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:3px">Advance received</div>
+          <div style="font-size:20px;font-weight:700;color:#028090" id="b-advance">₹0</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:3px">Expenses approved</div>
+          <div style="font-size:20px;font-weight:700;color:#1B2A4A" id="b-spent">₹0</div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:3px">Balance remaining</div>
+          <div style="font-size:20px;font-weight:700" id="b-balance">₹0</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="tabs" id="main-tabs">
     <div class="tab active" onclick="showTab('add',this)" id="tab-btn-add">+ Add expense</div>
     <div class="tab" onclick="showTab('log',this)" id="tab-btn-log">Expense log</div>
@@ -1519,21 +1540,38 @@ function renderAll() {
 function renderSummary() {
   const today = todayStr(); const month = today.slice(0,7);
   const mine = expenses.filter(e=>e.staff.toLowerCase()===currentUser.toLowerCase());
-  const td = mine.filter(e=>e.date===today);
-  const mn = mine.filter(e=>e.date&&e.date.startsWith(month));
+  const td = mine.filter(e=>e.date===today&&e.cat!=='advance');
+  const mn = mine.filter(e=>e.date&&e.date.startsWith(month)&&e.cat!=='advance');
   document.getElementById('s-today').textContent = '₹'+td.reduce((s,e)=>s+e.amount,0).toLocaleString('en-IN');
   document.getElementById('s-month').textContent = '₹'+mn.reduce((s,e)=>s+e.amount,0).toLocaleString('en-IN');
   const myPending = mine.filter(e=>e.status==='pending').length;
-  // For supervisor: approval badge shows employee pending count
   const approvalPending = currentRole==='supervisor'
     ? expenses.filter(e=>(e.role==='employee'||!e.role)&&e.status==='pending').length
     : currentRole==='owner'
     ? expenses.filter(e=>e.role==='supervisor'&&e.status==='pending'&&e.amount>2000).length
     : myPending;
   document.getElementById('s-pending').textContent = myPending;
-  document.getElementById('s-approved').textContent = mine.filter(e=>(e.status==='approved'||e.status==='auto-approved')&&e.date===today).length;
+  document.getElementById('s-approved').textContent = mine.filter(e=>(e.status==='approved'||e.status==='auto-approved')&&e.date===today&&e.cat!=='advance').length;
   const pb = document.getElementById('pb');
   if(approvalPending>0){pb.textContent=approvalPending;pb.style.display='inline';}else pb.style.display='none';
+
+  // Balance card — show for employee and supervisor only
+  const balCard = document.getElementById('balance-card');
+  if(balCard && (currentRole==='employee'||currentRole==='supervisor')) {
+    balCard.style.display = 'block';
+    // Total advance received (all time)
+    const totalAdvance = mine.filter(e=>e.cat==='advance'||e.status==='advance').reduce((s,e)=>s+e.amount,0);
+    // Total approved expenses (all time, excluding advances)
+    const totalSpent = mine.filter(e=>(e.status==='approved'||e.status==='auto-approved')&&e.cat!=='advance').reduce((s,e)=>s+e.amount,0);
+    const balance = totalAdvance - totalSpent;
+    document.getElementById('b-advance').textContent = '₹'+totalAdvance.toLocaleString('en-IN');
+    document.getElementById('b-spent').textContent   = '₹'+totalSpent.toLocaleString('en-IN');
+    const balEl = document.getElementById('b-balance');
+    balEl.textContent = '₹'+Math.abs(balance).toLocaleString('en-IN') + (balance<0?' (overspent)':balance===0?' (settled)':'');
+    balEl.style.color = balance>0?'#10B981':balance<0?'#EF4444':'#028090';
+  } else if(balCard) {
+    balCard.style.display = 'none';
+  }
 }
 
 function renderLog() {
