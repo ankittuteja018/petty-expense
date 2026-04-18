@@ -1416,6 +1416,12 @@ async function addExpense() {
   const vname  = document.getElementById('i-vname').value.trim();
   const vphone = document.getElementById('i-vphone').value.trim();
   const vaddr  = document.getElementById('i-vaddr').value.trim();
+
+  // Debug — show what values we have
+  if(!staff||!date||!amount||!desc) {
+    alert('Missing: ' + (!staff?'staff ':'')+(!date?'date ':'')+(!amount?'amount ':'')+(!desc?'desc':''));
+    return;
+  }
   if (!staff)  { alert('Please enter staff name.'); return; }
   if (!date)   { alert('Please select a date.'); return; }
   const monthCheck = isExpenseAllowed(date, cat);
@@ -1426,10 +1432,9 @@ async function addExpense() {
     if (!vname)  { alert('Vendor name is required for this category.'); return; }
     if (!vphone) { alert('Vendor Contact is required for this category.'); return; }
     if (!/^[0-9]{10}$/.test(vphone.replace(/\s/g,''))) { alert('Vendor Contact must be a 10-digit phone number.'); return; }
-    if (!/^[0-9]{10}$/.test(vphone.replace(/\s/g,''))) { alert('Vendor Contact must be a 10-digit phone number.'); return; }
     if (!vaddr)  { alert('Vendor Address is required for this category.'); return; }
   }
-  if (!photoData.length) { showGlobalNotice('Photo proof is compulsory. Please upload a photo before submitting.','error'); return; }
+  if (!photoData.length) { alert('Photo proof is compulsory. Please upload a photo.'); return; }
   // Duplicate detection
   const dup = expenses.find(e => e.staff===staff && e.date===date && e.cat===cat && e.amount===amount && e.status!=='rejected');
   if(dup) {
