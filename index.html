@@ -790,7 +790,7 @@ tr:hover td{background:var(--tr-hover)}
 let expenses = [];
 let filterCat = 'all';
 let photoData = [];
-let sheetUrl = 'https://script.google.com/macros/s/AKfycbyGCR5lvxHG_q3LA6eRvGn4DylUs4pPNNaxbOZSTWfxJogvyC2m9MkK8USNioy-1wcV/exec'; // hardcoded default
+let sheetUrl = 'https://script.google.com/macros/s/AKfycbxu5aJWCwAyRl0jX75f0vlMVkoGRhMlvKEQ-W7StrN9gclk0ZgE5nSfr7G810FEw5jU/exec'; // hardcoded default
 
 const CATS = {
   fooding:      { label: 'Fooding',              cls: 'b-fooding' },
@@ -812,29 +812,58 @@ function todayStr() { return new Date().toISOString().split('T')[0]; }
 const DEFAULT_USERS = [{ username:'admin', password:'admin123', fullname:'Admin', role:'owner' }];
 let cachedUsers = null;
 
-async function fetchUsers() {
-  if(!sheetUrl) return DEFAULT_USERS;
-  try {
-    const res = await fetch(sheetUrl + '?action=getUsers');
-    const data = await res.json();
-    if(data.success && data.users && data.users.length > 0) {
-      cachedUsers = data.users;
-      return data.users;
-    }
-  } catch(e) {}
-  return cachedUsers || DEFAULT_USERS;
-}
-
+// Always save users to both sheet AND localStorage for reliability
 async function saveUsersToSheet(users) {
   if(!sheetUrl) return;
+  // Save to localStorage immediately as backup
+  try { localStorage.setItem('fpe_users_cache', JSON.stringify(users)); } catch(e) {}
+  // Save to sheet
   try {
     const encoded = encodeURIComponent(JSON.stringify(users));
     await fetch(sheetUrl + '?action=saveUsers&users=' + encoded);
   } catch(e) {}
 }
 
-function getUsers() {
+async function fetchUsers() {
+  // 1. Try sheet first (always most up to date)
+  if(sheetUrl) {
+    try {
+      const res = await fetch(sheetUrl + '?action=getUsers');
+      const data = await res.json();
+      if(data.success && data.users && data.users.length > 0) {
+        cachedUsers = data.users;
+        // Keep localStorage in sync
+        try { localStorage.setItem('fpe_users_cache', JSON.stringify(data.users)); } catch(e) {}
+        return data.users;
+      }
+    } catch(e) {}
+  }
+  // 2. Fall back to localStorage cache
+  try {
+    const cached = localStorage.getItem('fpe_users_cache');
+    if(cached) {
+      const users = JSON.parse(cached);
+      if(users && users.length > 0) {
+        cachedUsers = users;
+        return users;
+      }
+    }
+  } catch(e) {}
+  // 3. Last resort — default admin only
   return cachedUsers || DEFAULT_USERS;
+}
+
+function getUsers() {
+  // Return in-memory cache, or localStorage cache, or default
+  if(cachedUsers && cachedUsers.length > 0) return cachedUsers;
+  try {
+    const cached = localStorage.getItem('fpe_users_cache');
+    if(cached) {
+      const users = JSON.parse(cached);
+      if(users && users.length > 0) { cachedUsers = users; return users; }
+    }
+  } catch(e) {}
+  return DEFAULT_USERS;
 }
 
 async function addUser() {
@@ -932,7 +961,15 @@ async function loginUser() {
 
   btn.textContent = 'Sign in →'; btn.disabled = false;
 
-  if(!user){ errEl.textContent='Incorrect username or password.'; errEl.style.display='block'; return; }
+  if(!user){
+    // Check if we have any users at all — if only default, sheet may not be reachable
+    if(users.length === 1 && users[0].username === 'admin') {
+      errEl.textContent = 'Could not load users from sheet. Check internet connection and try again.';
+    } else {
+      errEl.textContent = 'Incorrect username or password.';
+    }
+    errEl.style.display='block'; return;
+  }
   errEl.style.display='none';
 
   currentUser = user.fullname;
@@ -1159,14 +1196,19 @@ function init() {
   initPWA();
   const dateEl = document.getElementById('i-date');
   if(dateEl){ dateEl.value = todayStr(); dateEl.max = todayStr(); }
-  sheetUrl = 'https://script.google.com/macros/s/AKfycbyGCR5lvxHG_q3LA6eRvGn4DylUs4pPNNaxbOZSTWfxJogvyC2m9MkK8USNioy-1wcV/exec';
+  sheetUrl = 'https://script.google.com/macros/s/AKfycbxu5aJWCwAyRl0jX75f0vlMVkoGRhMlvKEQ-W7StrN9gclk0ZgE5nSfr7G810FEw5jU/exec';
   try {
     const savedUrl = localStorage.getItem('fpe_sheet_url');
     if(savedUrl) sheetUrl = savedUrl;
     document.getElementById('sheet-url').value = sheetUrl;
     monthlyBudget = parseFloat(localStorage.getItem('fpe_budget')||'0');
     const bi = document.getElementById('budget-input'); if(bi && monthlyBudget) bi.value = monthlyBudget;
+    // Pre-load users from localStorage cache so they're available immediately
+    const cached = localStorage.getItem('fpe_users_cache');
+    if(cached) { try { cachedUsers = JSON.parse(cached); } catch(e){} }
   } catch(e){}
+  // Refresh users from sheet in background
+  fetchUsers().then(users => { cachedUsers = users; renderUserList(); });
   // Check if already logged in
   currentUser = localStorage.getItem('fpe_username')||'';
   currentRole = localStorage.getItem('fpe_role')||'employee';
