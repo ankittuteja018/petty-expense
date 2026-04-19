@@ -487,7 +487,7 @@ tr:hover td{background:var(--tr-hover)}
         </div>
         <div class="table-wrap" style="margin-top:12px">
           <table>
-            <thead><tr><th>Ref</th><th>Date</th><th>Staff</th><th>Location</th><th style="text-align:right">Advance given</th><th style="text-align:right">Expenses submitted</th><th style="text-align:right">Balance outstanding</th><th>Notes</th><th>Action</th></tr></thead>
+            <thead><tr><th>Ref</th><th>Date</th><th>Staff</th><th>Location</th><th style="text-align:right">Amount</th><th style="text-align:right">Balance outstanding</th><th>Notes</th><th>Action</th></tr></thead>
             <tbody id="advance-tbody"></tbody>
           </table>
         </div>
@@ -1103,45 +1103,41 @@ function getAdvancesFromSheet() {
 function renderAdvances() {
   const el = document.getElementById('advance-tbody'); if(!el) return;
   const advanceRows = expenses.filter(e=>e.cat==='advance'||e.status==='advance');
-  if(!advanceRows.length){ el.innerHTML='<tr><td colspan="9" class="empty-state">No advances recorded.</td></tr>'; return; }
+  if(!advanceRows.length){ el.innerHTML='<tr><td colspan="8" class="empty-state">No advances recorded.</td></tr>'; return; }
 
-  // Group by staff
-  const staffMap = {};
-  advanceRows.forEach(a=>{
-    const key = a.staff.trim().toLowerCase();
-    if(!staffMap[key]) staffMap[key] = { name:a.staff.trim(), advances:[], total:0 };
-    staffMap[key].advances.push(a);
-    staffMap[key].total += a.amount;
-  });
+  // Sort by date descending
+  const sorted = [...advanceRows].sort((a,b)=>new Date(b.date)-new Date(a.date));
 
-  // Approved expenses per staff
+  // Approved expenses per staff for balance column
   const staffExpenses = {};
   expenses.filter(e=>(e.status==='approved'||e.status==='auto-approved')&&e.cat!=='advance').forEach(e=>{
     const key = e.staff.trim().toLowerCase();
     staffExpenses[key] = (staffExpenses[key]||0) + e.amount;
   });
 
-  el.innerHTML = Object.values(staffMap).sort((a,b)=>b.total-a.total).map(s=>{
-    const totalAdv = s.total;
-    const totalExp = staffExpenses[s.name.toLowerCase()]||0;
+  // Total advance per staff for balance
+  const staffAdvTotal = {};
+  advanceRows.forEach(a=>{
+    const key = a.staff.trim().toLowerCase();
+    staffAdvTotal[key] = (staffAdvTotal[key]||0) + a.amount;
+  });
+
+  el.innerHTML = sorted.map(a=>{
+    const enteredBy = a.role==='owner' ? '(by owner)' : '(by staff)';
+    const staffKey = a.staff.trim().toLowerCase();
+    const totalAdv = staffAdvTotal[staffKey]||0;
+    const totalExp = staffExpenses[staffKey]||0;
     const balance = totalAdv - totalExp;
     const balColor = balance>0?'#F59E0B':balance<0?'#EF4444':'#10B981';
-    const lastAdv = s.advances[s.advances.length-1];
-    const enteredBy = lastAdv.role==='owner' ? '(by owner)' : '(by staff)';
-    // Show edit button only if single advance entry (for simplicity)
-    const editBtn = s.advances.length===1
-      ? `<button class="btn-sm btn-approve" onclick="openEditAdvanceModal('${lastAdv.id}')">Edit</button>`
-      : `<button class="btn-sm" style="background:var(--bg);border:1px solid var(--border);color:var(--text-muted)" onclick="openEditAdvanceModal('${lastAdv.id}')">Edit last</button>`;
     return `<tr>
-      <td style="font-size:11px;color:var(--text-muted)">${lastAdv.ref||'—'}</td>
-      <td style="color:var(--text-muted);font-size:11.5px">${fmtDate(lastAdv.date)}</td>
-      <td style="font-weight:600">${s.name} <span style="font-size:10px;color:var(--text-faint)">${enteredBy}</span></td>
-      <td style="color:var(--text-muted)">${lastAdv.location||'—'}</td>
-      <td style="text-align:right;font-weight:700">₹${totalAdv.toLocaleString('en-IN')}</td>
-      <td style="text-align:right">₹${totalExp.toLocaleString('en-IN')}</td>
+      <td style="font-size:11px;color:var(--text-muted)">${a.ref||'—'}</td>
+      <td style="color:var(--text-muted);font-size:11.5px;white-space:nowrap">${fmtDate(a.date)}</td>
+      <td style="font-weight:600">${a.staff} <span style="font-size:10px;color:var(--text-faint)">${enteredBy}</span></td>
+      <td style="color:var(--text-muted)">${a.location||'—'}</td>
+      <td style="text-align:right;font-weight:700">₹${a.amount.toLocaleString('en-IN')}</td>
       <td style="text-align:right;font-weight:700;color:${balColor}">₹${Math.abs(balance).toLocaleString('en-IN')} ${balance>0?'pending':balance<0?'overspent':'settled'}</td>
-      <td style="color:var(--text-muted);font-size:11.5px">${s.advances.map(a=>a.desc||'').filter(Boolean).join(' | ')||'—'}</td>
-      <td>${editBtn}</td>
+      <td style="color:var(--text-muted);font-size:11.5px">${a.desc||'—'}</td>
+      <td><button class="btn-sm btn-approve" onclick="openEditAdvanceModal('${a.id}')">Edit</button></td>
     </tr>`;
   }).join('');
 }
@@ -1595,7 +1591,7 @@ function renderSummary() {
 }
 
 function renderLog() {
-  const myExpenses = expenses.filter(e=>e.staff.toLowerCase()===currentUser.toLowerCase());
+  const myExpenses = expenses.filter(e=>e.staff.toLowerCase()===currentUser.toLowerCase() && e.cat!=='advance' && e.status!=='advance');
   const searchQ = (document.getElementById('expense-search')?.value||'').toLowerCase().trim();
   let filtered = filterCat==='all' ? myExpenses : myExpenses.filter(e=>e.cat===filterCat);
   if(searchQ) {
@@ -1641,7 +1637,7 @@ function renderLog() {
 }
 
 function renderApproval() {
-  const allPending = expenses.filter(e=>e.status==='pending');
+  const allPending = expenses.filter(e=>e.status==='pending' && e.cat!=='advance');
   let pending = [];
   if (currentRole === 'owner') {
     // Owner sees supervisor expenses above ₹2000
@@ -1697,12 +1693,12 @@ function onPeriodChange() {
 
 function getFilteredByPeriod() {
   const period = document.getElementById('owner-period')?.value || 'month';
-  // Exclude deleted expenses from all reports
   const today = todayStr();
   const now = new Date();
   return expenses.filter(e => {
     if (!e.date) return false;
     if (e.status === 'deleted') return false;
+    if (e.cat === 'advance' || e.status === 'advance') return false; // exclude advances
     if (period==='today') return e.date===today;
     if (period==='week') {
       const d = new Date(e.date+'T00:00:00');
@@ -1721,7 +1717,7 @@ function getFilteredByPeriod() {
 }
 
 function renderOwner() {
-  const all = getFilteredByPeriod();
+  const all = getFilteredByPeriod().filter(e=>e.cat!=='advance'&&e.status!=='advance');
   const approved = all.filter(e=>e.status==='approved'||e.status==='auto-approved');
   const total = all.reduce((s,e)=>s+e.amount,0);
   const approvedTotal = approved.reduce((s,e)=>s+e.amount,0);
