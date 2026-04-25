@@ -204,6 +204,7 @@ tr:hover td{background:var(--tr-hover)}
     <h1>Aaray Packaging Private Limited</h1>
     <p style="font-size:10px;color:#8BAFC8;letter-spacing:1.5px;font-weight:600;text-transform:uppercase;margin-top:2px">PETTY EXPENSE TRACKER</p>
   </div>
+  <div></div>
   <div class="topbar-right" style="justify-content:flex-end">
     <span style="font-size:12px;color:#8BAFC8">Hi, <span id="user-name-display" style="color:#02C39A;font-weight:600"></span></span>
     <button onclick="changeMyPassword()" style="background:none;border:1px solid #3a5068;color:#8BAFC8;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer">Password</button>
@@ -441,11 +442,11 @@ tr:hover td{background:var(--tr-hover)}
         <div style="display:flex;gap:8px;align-items:center">
 <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
             <select id="owner-period" onchange="onPeriodChange()" style="font-size:12px;padding:5px 8px;border:1px solid #D1D9E0;border-radius:6px;color:#1B2A4A">
+              <option value="all">All time</option>
               <option value="today">Today</option>
               <option value="week">This week</option>
               <option value="month" selected>This month</option>
               <option value="custom">Custom range</option>
-              <option value="all">All time</option>
             </select>
             <div id="custom-range" style="display:none;gap:6px;align-items:center">
               <input type="date" id="range-from" onchange="renderOwner()" style="font-size:12px;padding:5px 8px;border:1px solid #D1D9E0;border-radius:6px;color:#1B2A4A">
@@ -1248,8 +1249,11 @@ function init() {
   if(dateEl){ dateEl.value = todayStr(); dateEl.max = todayStr(); }
   sheetUrl = 'https://script.google.com/macros/s/AKfycbxu5aJWCwAyRl0jX75f0vlMVkoGRhMlvKEQ-W7StrN9gclk0ZgE5nSfr7G810FEw5jU/exec';
   try {
+    // Only use localStorage URL if it was explicitly saved by owner in Settings
     const savedUrl = localStorage.getItem('fpe_sheet_url');
-    if(savedUrl) sheetUrl = savedUrl;
+    if(savedUrl && savedUrl !== 'https://script.google.com/macros/s/AKfycbz7_JceElnyO5nLgWv2-6XgqPhFqDWVH46U7q3CCf487nABrGO3mUahw2YvdVQV3lan/exec') {
+      sheetUrl = savedUrl;
+    }
     document.getElementById('sheet-url').value = sheetUrl;
     monthlyBudget = parseFloat(localStorage.getItem('fpe_budget')||'0');
     const bi = document.getElementById('budget-input'); if(bi && monthlyBudget) bi.value = monthlyBudget;
@@ -1389,7 +1393,7 @@ function showTab(name, el) {
   }
   // Auto-refresh approval tab every 60 seconds
   if(autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; }
-  if(name==='approval' && sheetUrl) {
+  if((name==='approval'||name==='owner') && sheetUrl) {
     autoRefreshTimer = setInterval(()=>{ loadFromSheet(); }, 60000);
   }
 }
@@ -2764,7 +2768,7 @@ function exportExcel() {
   URL.revokeObjectURL(url);
 }
 
-init();
+try { init(); } catch(e) { console.error('Init error:', e); document.body.innerHTML += '<div style="padding:20px;color:red;font-size:14px">App error: ' + e.message + '</div>'; }
 </script>
 </div></div>
 </body>
